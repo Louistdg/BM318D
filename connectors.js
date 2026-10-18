@@ -3,7 +3,7 @@
 const token=document.querySelector('meta[name="mc-token"]')?.content||'';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const api=async(action,d={})=>{const r=await fetch('/api/mc/connectors/'+action,{method:'POST',headers:{'Content-Type':'application/json','X-MC-Token':token},body:JSON.stringify({project:Number(document.getElementById('project').value),...d})});const v=await r.json();if(!r.ok)throw Error(v.error||'Erreur');return v};
-const button=document.createElement('button');button.textContent='Connecteurs IA / MCP';button.style.cssText='position:fixed;right:18px;bottom:16px;z-index:1200';document.body.append(button);
+const button=document.createElement('button');button.className='cx-launcher';button.textContent='Connecteurs IA / MCP';button.style.cssText='position:fixed;right:18px;bottom:16px;z-index:1200';document.body.append(button);
 const dialog=document.createElement('dialog');dialog.style.cssText='width:min(1000px,95vw);max-height:90vh;overflow:auto;background:#141922;color:#eee;border:1px solid #687187;border-radius:12px;padding:24px';document.body.append(dialog);
 let state={connectors:[]};
 const report=e=>{dialog.querySelector('#cx-message').textContent=e.message||String(e)};

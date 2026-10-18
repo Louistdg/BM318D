@@ -37,3 +37,11 @@ button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-vis
 }
 #mission.view.active{display:flex;flex-direction:column;min-height:0}
 #mission .mc-stage,#mission #mcRecords{height:auto;flex:1 1 auto;min-height:0}
+/* Mission Control has its own actions; Compte contains the connector manager. */
+.main:has(#mission.active)>.subhead{display:none}
+body:has(#mission.active)>.cx-launcher{display:none}
+.mc-legend{max-width:calc(100% - 260px);line-height:1.5}
+.mc-stage:has(#mcNodes>.mc-empty) .mc-world{width:100%;height:100%;transform:none !important}
+.mc-stage:has(#mcNodes>.mc-empty) .mc-empty{position:absolute;inset:0;display:grid;place-content:center;padding:24px;text-align:center;line-height:1.7;overflow-wrap:anywhere}
+.mc-stage:has(#mcNodes>.mc-empty) .mc-legend,.mc-stage:has(#mcNodes>.mc-empty) .mc-minimap{display:none}
+@media(max-width:760px){.mc-legend{max-width:none;max-height:none;font-size:11px}}
