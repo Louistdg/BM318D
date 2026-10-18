@@ -1,7 +1,7 @@
 from pathlib import Path
 p=Path('mission.js');s=p.read_text(encoding='utf-8')
-old="'<button id="mcSave" class="primary">Enregistrer / Transférer</button><h4>Tâches attribuées ('"
-new="'<button id="mcSave" class="primary">Enregistrer / Transférer</button><button id="mcContext">Voir le dossier de passation</button><h4>Tâches attribuées ('"
+old="""'<button id="mcSave" class="primary">Enregistrer / Transférer</button><h4>Tâches attribuées ('"""
+new="""'<button id="mcSave" class="primary">Enregistrer / Transférer</button><button id="mcContext">Voir le dossier de passation</button><h4>Tâches attribuées ('"""
 assert old in s
 s=s.replace(old,new)
 needle=" $('mcClose').onclick=()=>panel.style.display='none';"
