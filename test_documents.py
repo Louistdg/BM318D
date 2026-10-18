@@ -1,5 +1,6 @@
 """Documents contract, real HTTP and SQLite; never opens the production database."""
 import http.server
+import base64
 import json
 import os
 from pathlib import Path
@@ -13,6 +14,7 @@ _temp = tempfile.TemporaryDirectory(prefix='bm318d-documents-')
 os.environ['MC_DB'] = str(Path(_temp.name) / 'documents.sqlite3')
 import MissionControl as mc
 import mc_security as security
+import mc_documents
 
 
 class Documents(unittest.TestCase):
@@ -118,6 +120,38 @@ class Documents(unittest.TestCase):
         self.assertEqual(self.call('save', {'project': 1, 'id': item['id'], 'title': 'no version'})[0], 400)
         self.assertEqual(self.call()[1]['items'][0]['content'], 'new')
 
+    def test_import_is_copied_to_project_disk_and_served_back(self):
+        with security.use(self.admin), mc.connect() as c:
+            root=Path(_temp.name)/'local-project-files'
+            mc.dispatch(c,'/api/mc/settings',{'project':1,'key':'workspace_dir','value':str(root)})
+        folder=self.create(kind='folder',title='Plans')
+        data={'project':1,'name':'brief.txt','data':base64.b64encode(b'rapport local').decode(),'parent_id':folder['id']}
+        status,body=self.call('import',data)
+        self.assertEqual(status,201,body)
+        item=body['item'];target=root/'p1'/'fichiers-importes'/('dossier-%d-plans'%folder['id'])/'brief.txt'
+        self.assertEqual(target.read_bytes(),b'rapport local')
+        self.assertEqual(item['content'],'')
+        self.assertEqual(item['storage_path'],target.relative_to(root).as_posix())
+        self.assertEqual(item['storage_root'],str(root.resolve()))
+        self.assertEqual(body['saved_to'],str(target))
+        req=urllib.request.Request(self.url+'/api/mc/documents/file?project=1&id='+str(item['id']),headers={'X-MC-Token':mc.TOKEN})
+        with urllib.request.urlopen(req,timeout=5) as response:
+            self.assertEqual(response.status,200)
+            self.assertEqual(response.read(),b'rapport local')
+        with security.use(self.admin),mc.connect() as c:
+            mc.dispatch(c,'/api/mc/settings',{'project':1,'key':'workspace_dir','value':str(Path(_temp.name)/'new-project-root')})
+            old=mc_documents.items(c,1)['items']
+        self.assertEqual(next(x for x in old if x['id']==item['id'])['local_path'],str(target))
+        with urllib.request.urlopen(req,timeout=5) as response:self.assertEqual(response.read(),b'rapport local')
+        with mc.connect() as c:
+            self.assertEqual(c.execute('SELECT content FROM mc_documents WHERE id=?',(item['id'],)).fetchone()[0],'')
+
+    def test_import_rejects_bad_names_and_oversize(self):
+        for name in ('../secret.txt','C:secret.txt','NUL.txt',''):
+            self.assertEqual(self.call('import',{'project':1,'name':name,'data':base64.b64encode(b'x').decode()})[0],400)
+        too_large='A'*((((8*1024*1024+2)//3)*4))
+        self.assertEqual(self.call('import',{'project':1,'name':'big.bin','data':too_large})[0],400)
+
     def test_invalid_values_and_unknown_ids_do_not_write(self):
         for fields in ({'title': ''}, {'title': 'x' * 161}, {'content': 'x' * 8001}, {'kind': 'command'},
                        {'x': -1}, {'x': 10001}, {'x': float('nan')}, {'y': True}, {'y': '4'},
@@ -133,6 +167,27 @@ class Documents(unittest.TestCase):
         self.assertEqual(self.call()[1]['items'][0], item)
         with mc.connect() as c:
             self.assertEqual([tuple(row) for row in c.execute('SELECT id,name FROM projects ORDER BY id')], [(1, 'First'), (2, 'Second')])
+
+    def test_storage_migration_keeps_existing_rows_and_makes_backup(self):
+        original=mc.DB;legacy=Path(_temp.name)/'legacy.sqlite3';mc.DB=legacy
+        try:
+            with mc.connect() as c:
+                c.execute('CREATE TABLE projects(id INTEGER PRIMARY KEY,name TEXT NOT NULL)')
+                c.execute("INSERT INTO projects VALUES(1,'Legacy')")
+                c.execute("""CREATE TABLE mc_documents(id INTEGER PRIMARY KEY,project_id INTEGER NOT NULL,
+                    parent_id INTEGER,kind TEXT NOT NULL,title TEXT NOT NULL,content TEXT NOT NULL DEFAULT '',
+                    content_type TEXT NOT NULL DEFAULT 'note',x REAL NOT NULL DEFAULT 100,y REAL NOT NULL DEFAULT 100,
+                    revision INTEGER NOT NULL DEFAULT 1,deleted_at TEXT,created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP)""")
+                c.execute("INSERT INTO mc_documents(id,project_id,kind,title,content) VALUES(1,1,'file','Legacy note','kept')")
+            mc.init()
+            with mc.connect() as c:
+                row=c.execute('SELECT title,content FROM mc_documents WHERE id=1').fetchone()
+                columns={r[1] for r in c.execute('PRAGMA table_info(mc_documents)')}
+            self.assertEqual(tuple(row),('Legacy note','kept'))
+            self.assertTrue({'storage_path','storage_root'}.issubset(columns))
+            self.assertTrue(list((legacy.parent/'backups').glob('*.sqlite3')))
+        finally:mc.DB=original
 
 
 if __name__ == '__main__':

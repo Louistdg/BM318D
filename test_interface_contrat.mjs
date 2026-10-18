@@ -8,6 +8,7 @@ const mission = fs.readFileSync(new URL('./mission.js', import.meta.url), 'utf8'
 const html = fs.readFileSync(new URL('./BM318d-Railway.html', import.meta.url), 'utf8');
 const securite = fs.readFileSync(new URL('./security-ui.js', import.meta.url), 'utf8');
 const connecteurs = fs.readFileSync(new URL('./connectors.js', import.meta.url), 'utf8');
+const workspace = fs.readFileSync(new URL('./workspace.js', import.meta.url), 'utf8');
 
 function extraire(source, nom) {
   const marque = 'function ' + nom;
@@ -67,5 +68,10 @@ assert.ok(connecteurs.includes('name="model"'));
 assert.ok(connecteurs.includes('fieldset'));
 assert.ok(connecteurs.includes('readonly'));
 assert.ok(!connecteurs.includes('sessionStorage'));
+assert.ok(workspace.includes('Importer des fichiers'));
+assert.ok(workspace.includes('type="file" multiple'));
+assert.ok(workspace.includes("docApi('import'"));
+assert.ok(workspace.includes("/api/mc/documents/file?"));
+assert.ok(workspace.includes('item.local_path'));
 
 console.log('ok contrat interface');

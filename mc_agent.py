@@ -38,8 +38,9 @@ class Refus(Exception):
     """Opération refusée par les règles de sécurité du workspace."""
 
 
-def racine_workspace(projet, agent, job):
-    base = (WORKSPACES / ('p%d' % projet) / ('a%d' % agent) / ('job%d' % job))
+def racine_workspace(projet, agent, job, racine=None):
+    racine = Path(racine) if racine is not None else WORKSPACES
+    base = (racine / ('p%d' % projet) / ('a%d' % agent) / ('job%d' % job))
     base.mkdir(parents=True, exist_ok=True)
     return base.resolve()
 

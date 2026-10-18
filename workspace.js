@@ -162,9 +162,9 @@
    ()=>api('/api/task/update',{id:t[0],project,title:document.getElementById('taskEditTitle').value,priority:document.getElementById('taskEditPriority').value,agent:document.getElementById('taskEditAgent').value}));
  };
 
- /* Documents: all records are project scoped server-side. Nothing reaches local agent tools or the filesystem. */
+ /* Documents are project scoped; notes stay in SQLite and explicit imports are copied into local project folders. */
  const section=document.createElement('section');section.id='documents';section.className='view';
- section.innerHTML='<div class="documents-layout"><header class="documents-header"><div><h2>Dossiers & fiches</h2><p class="subtle">Organise tes notes, liens et informations de projet. Les modifications sont enregistrées dans SQLite.</p></div><div class="documents-actions"><button id="docNewFolder">＋ Dossier</button><button id="docNewFile">＋ Fiche</button></div></header><div class="documents-body"><aside class="documents-tree"><strong>Arborescence</strong><div id="docTree"></div></aside><div class="documents-board"><div class="documents-path" id="docPath"></div><div class="documents-scroll" id="docScroll"><div class="documents-world" id="docWorld"></div></div><p class="documents-hint">Déplace les fiches sur le canevas. Ouvre un dossier pour parcourir son contenu ; « Modifier » permet de changer de dossier.</p></div><aside id="docDetails" class="documents-details" hidden></aside></div></div>';
+ section.innerHTML='<div class="documents-layout"><header class="documents-header"><div><h2>Dossiers & fiches</h2><p class="subtle">Les notes restent dans le projet. Les fichiers importés sont copiés sur ton disque, dans le dossier local du projet ; l’original reste en place.</p></div><div class="documents-actions"><button id="docImport">＋ Importer des fichiers</button><input id="docFileInput" type="file" multiple hidden><button id="docNewFolder">＋ Dossier</button><button id="docNewFile">＋ Fiche</button></div></header><div class="documents-body"><aside class="documents-tree"><strong>Arborescence</strong><div id="docTree"></div></aside><div class="documents-board"><div class="documents-path" id="docPath"></div><div class="documents-scroll" id="docScroll"><div class="documents-world" id="docWorld"></div></div><p class="documents-hint">Déplace les fiches sur le canevas. Ouvre un dossier pour parcourir son contenu ; « Modifier » permet de changer de dossier.</p></div><aside id="docDetails" class="documents-details" hidden></aside></div></div>';
  main.append(section);
  let documents=[],currentFolder=null,selectedDoc=null,documentsProject=null,docLoading=false,docDirty=false,docDrag=null;
  const docEl=id=>document.getElementById(id);
@@ -206,7 +206,7 @@
      '<label>Titre</label><input id="docTitle" maxlength="160" required value="'+safe(item?.title||'')+'">'+
      '<label>Dossier parent</label><select id="docParent">'+folderChoices(item)+'</select>'+
      (folder?'':'<label>Type de contenu</label><select id="docContentType"><option value="note">Notes</option><option value="link">Liens</option><option value="info">Informations du projet</option></select><label>Contenu</label><textarea id="docContent" maxlength="8000" placeholder="Notes, liens ou informations…">'+safe(item?.content||'')+'</textarea>')+
-     (editing?'<p><button type="button" id="docDelete" class="doc-danger">Supprimer cette fiche</button></p>':''),
+     (editing?'<p>'+(item?.storage_path?'<span class="subtle">Retirer la fiche de BM318d ne supprime pas le fichier sur ton disque.</span><br>':'')+'<button type="button" id="docDelete" class="doc-danger">Supprimer cette fiche</button></p>':''),
      async()=>{
        const payload={kind,title:docEl('docTitle').value,parent_id:docEl('docParent').value?Number(docEl('docParent').value):null};
        if(!folder){payload.content_type=docEl('docContentType').value;payload.content=docEl('docContent').value}
@@ -227,14 +227,15 @@
  function selectDoc(item){
    selectedDoc=item.id;
    const panel=docEl('docDetails');panel.hidden=false;
-   panel.innerHTML='<button type="button" id="docClose">× Fermer</button><p class="subtle">'+(item.kind==='folder'?'DOSSIER':safe(item.content_type).toUpperCase())+'</p><h3>'+safe(item.title)+'</h3><div class="doc-preview" id="docPreview"></div><button id="docModify">Modifier</button>'+(item.kind==='folder'?'<button id="docOpenFolder">Ouvrir ce dossier</button>':'');
-   const preview=docEl('docPreview');preview.textContent=item.kind==='folder'?'Dossier du projet':item.content||'Aucun contenu';
+   panel.innerHTML='<button type="button" id="docClose">× Fermer</button><p class="subtle">'+(item.kind==='folder'?'DOSSIER':item.storage_path?'FICHIER SUR TON PC':safe(item.content_type).toUpperCase())+'</p><h3>'+safe(item.title)+'</h3><div class="doc-preview" id="docPreview"></div>'+(item.kind==='folder'?'<button id="docModify">Modifier</button><button id="docOpenFolder">Ouvrir ce dossier</button>':item.storage_path?'<button id="docDownload">Ouvrir / télécharger</button><button id="docModify">Modifier le classement</button>':'<button id="docModify">Modifier</button>');
+   const preview=docEl('docPreview');preview.textContent=item.kind==='folder'?'Dossier du projet':item.storage_path?('Fichier copié sur ton disque. Emplacement : '+(item.local_path||item.storage_path)):item.content||'Aucun contenu';
    if(item.content_type==='link'&&item.kind==='file'){
      const lines=item.content.split(/\s+/).filter(Boolean), links=lines.filter(x=>{try{return ['http:','https:'].includes(new URL(x).protocol)}catch(_){return false}});
      for(const address of links.slice(0,8)){const anchor=document.createElement('a');anchor.href=address;anchor.target='_blank';anchor.rel='noopener noreferrer';anchor.textContent='Ouvrir le lien';preview.append(document.createElement('br'),anchor)}
    }
    docEl('docClose').onclick=()=>{selectedDoc=null;panel.hidden=true};
    docEl('docModify').onclick=()=>docEditor(item,item.kind);
+   if(item.storage_path)docEl('docDownload').onclick=async()=>{try{const r=await fetch('/api/mc/documents/file?project='+encodeURIComponent(Number(project))+'&id='+encodeURIComponent(item.id),{headers:{'X-MC-Token':token},cache:'no-store'});if(!r.ok){const d=await r.json().catch(()=>({}));throw Error(d.error||'Fichier indisponible')}const url=URL.createObjectURL(await r.blob()),a=document.createElement('a');a.href=url;a.download=item.title;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000)}catch(e){notify(e.message)}};
    if(item.kind==='folder')docEl('docOpenFolder').onclick=()=>{currentFolder=item.id;selectedDoc=null;renderDocuments()};
  }
  function renderDocuments(){
@@ -251,7 +252,7 @@
    const list=documents.filter(x=>x.parent_id===currentFolder);
    const maxX=Math.max(1100,...list.map(x=>x.x+290)),maxY=Math.max(700,...list.map(x=>x.y+210));
    const world=docEl('docWorld');world.style.width=Math.min(11000,maxX)+'px';world.style.height=Math.min(11000,maxY)+'px';
-   world.innerHTML=list.length?list.map(x=>'<article class="doc-card" tabindex="0" data-doc-id="'+x.id+'" style="left:'+x.x+'px;top:'+x.y+'px"><strong>'+(x.kind==='folder'?'▣ ':'▤ ')+safe(x.title)+'</strong><small>'+(x.kind==='folder'?'Dossier':safe(({note:'Notes',link:'Liens',info:'Informations'})[x.content_type]||'Fiche'))+'</small><p>'+safe(x.kind==='folder'?'Ouvrir pour consulter':x.content.slice(0,115))+'</p><div class="doc-card-actions"><button type="button" data-doc-edit="'+x.id+'">Modifier</button>'+(x.kind==='folder'?'<button type="button" data-doc-open="'+x.id+'">Ouvrir</button>':'')+'</div></article>').join(''):'<p class="doc-empty">Cet espace est vide. Crée un dossier ou une fiche.</p>';
+   world.innerHTML=list.length?list.map(x=>'<article class="doc-card" tabindex="0" data-doc-id="'+x.id+'" style="left:'+x.x+'px;top:'+x.y+'px"><strong>'+(x.kind==='folder'?'▣ ':x.storage_path?'⌕ ':'▤ ')+safe(x.title)+'</strong><small>'+(x.kind==='folder'?'Dossier':x.storage_path?'Fichier local':safe(({note:'Notes',link:'Liens',info:'Informations'})[x.content_type]||'Fiche'))+'</small><p>'+safe(x.kind==='folder'?'Ouvrir pour consulter':x.storage_path?x.storage_path:x.content.slice(0,115))+'</p><div class="doc-card-actions"><button type="button" data-doc-edit="'+x.id+'">Modifier</button>'+(x.kind==='folder'?'<button type="button" data-doc-open="'+x.id+'">Ouvrir</button>':'')+'</div></article>').join(''):'<p class="doc-empty">Cet espace est vide. Crée un dossier, importe un fichier ou ajoute une fiche.</p>';
    for(const card of world.querySelectorAll('.doc-card')) {
      const ident=Number(card.dataset.docId);
      card.onclick=e=>{if(card.dataset.dragged==='true'||e.target.closest('button'))return;selectDoc(docItem(ident))};
@@ -287,6 +288,8 @@
  }
  docEl('docNewFolder').onclick=()=>docEditor(null,'folder');
  docEl('docNewFile').onclick=()=>docEditor(null,'file');
+ docEl('docImport').onclick=()=>docEl('docFileInput').click();
+ docEl('docFileInput').onchange=async()=>{const files=[...(docEl('docFileInput').files||[])];docEl('docFileInput').value='';if(!files.length)return;const imported=[],failed=[];for(const file of files){if(file.size>8*1024*1024){failed.push(file.name+' dépasse 8 Mo');continue}try{const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||''));reader.onerror=()=>reject(Error('Lecture du fichier impossible'));reader.readAsDataURL(file)});const encoded=dataUrl.slice(dataUrl.indexOf(',')+1),result=await docApi('import',{name:file.name,data:encoded,parent_id:currentFolder});imported.push(result.saved_to||file.name)}catch(e){failed.push(file.name+' : '+e.message)}}await refreshDocuments();notify(imported.length+' fichier(s) copié(s) sur le disque du projet'+(failed.length?' · échecs : '+failed.join('; '):'')+' · les originaux restent en place.')};
  /* The legacy modal can otherwise close without reporting an unsaved draft. */
  for(const b of [document.getElementById('cancel'),document.getElementById('modalback')]){
    b.addEventListener('click',e=>{

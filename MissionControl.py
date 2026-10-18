@@ -50,8 +50,10 @@ def init():
  with connect() as probe:
   needs_v22=not probe.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mc_connectors'").fetchone()
   needs_documents=not probe.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mc_documents'").fetchone()
- if DB.exists() and (needs_v22 or needs_documents):
-  prefix='v22-before-' if needs_v22 else 'before-documents-'
+  document_columns={r[1] for r in probe.execute('PRAGMA table_info(mc_documents)')} if not needs_documents else set()
+ needs_document_storage=not needs_documents and not {'storage_path','storage_root'}.issubset(document_columns)
+ if DB.exists() and (needs_v22 or needs_documents or needs_document_storage):
+  prefix='v22-before-' if needs_v22 else 'before-documents-' if needs_documents else 'before-document-storage-'
   sauvegarder(DB.parent/'backups'/(prefix+datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.sqlite3'))
  with connect() as c:
   c.executescript("""
@@ -267,7 +269,7 @@ def job_creer(c,p,d):
  modele=str(d.get('model') or a['model']).strip()[:80] or a['model']
  cur=c.execute('INSERT INTO mc_jobs(project_id,agent_id,mission_id,assignment_id,title,task,model,depends_on,branch_id) VALUES(?,?,?,?,?,?,?,?,?)',(p,a['id'],mission,attribution,titre,tache,modele,depend,branche))
  job=cur.lastrowid
- racine=mc_agent.racine_workspace(p,a['id'],job)
+ racine=mc_agent.racine_workspace(p,a['id'],job,reglages(c,p).get('workspace_dir'))
  c.execute('UPDATE mc_jobs SET workspace=? WHERE id=?',(str(racine),job))
  journal(c,job,'créé · agent %s · modèle %s'%(a['name'],modele))
  audit(c,p,'job_created',{'id':job,'agent':a['id'],'title':titre})
@@ -737,22 +739,27 @@ REGLAGES_DEFAUT={'ollama_url':'http://127.0.0.1:11434/api/chat','ollama_model':'
 
 def reglages(c,p):
  valeurs=dict(REGLAGES_DEFAUT)
+ valeurs['workspace_dir']=str(mc_agent.WORKSPACES)
  for ligne in rows(c,'SELECT key,value FROM mc_settings WHERE project_id=?',(p,)):valeurs[ligne['key']]=ligne['value']
  return valeurs
 
 def reglage_definir(c,p,d):
  cle=required_text(d,'key',40)
  if cle not in REGLAGES_DEFAUT:raise ValueError('Réglage inconnu : '+cle)
- valeur=str(d.get('value','')).strip()[:300]
- c.execute('INSERT INTO mc_settings(project_id,key,value) VALUES(?,?,?) ON CONFLICT(project_id,key) DO UPDATE SET value=excluded.value',(p,cle,valeur))
- if cle=='ollama_url' and valeur:mc_agent.OLLAMA=valeur
- if cle=='max_jobs':os.environ['MC_MAX_JOBS']=valeur
+ valeur=str(d.get('value','')).strip()[:1024]
  if cle=='workspace_dir':
   if not valeur:raise ValueError('Le dossier des workspaces ne peut pas être vide')
   cible=Path(valeur).expanduser()
   if not cible.is_absolute():raise ValueError('Le dossier des workspaces doit être un chemin absolu')
+  if os.name=='nt' and (not cible.drive or cible.drive.rstrip(':').upper() not in ('C','D')):
+   raise ValueError('Choisis un dossier sur le disque C: ou D:')
+  if os.name=='nt' and len(cible.parts)<2:raise ValueError('Choisis un sous-dossier sur C: ou D:, pas la racine du disque')
   cible.mkdir(parents=True,exist_ok=True)
-  mc_agent.WORKSPACES=cible.resolve()
+  if not cible.is_dir():raise ValueError('Le chemin choisi n’est pas un dossier')
+  valeur=str(cible.resolve())
+ c.execute('INSERT INTO mc_settings(project_id,key,value) VALUES(?,?,?) ON CONFLICT(project_id,key) DO UPDATE SET value=excluded.value',(p,cle,valeur))
+ if cle=='ollama_url' and valeur:mc_agent.OLLAMA=valeur
+ if cle=='max_jobs':os.environ['MC_MAX_JOBS']=valeur
  audit(c,p,'setting_changed',{'key':cle});return {'key':cle,'value':valeur}
 
 def rechercher(c,p,q):
@@ -833,6 +840,10 @@ def _dispatch(c,path,d):
   return mc_connectors.dispatch(c,p,path.rsplit('/',1)[-1],d)
  if path=='/api/mc/documents/save':return mc_documents.save(c,p,d)
  if path=='/api/mc/documents/delete':return mc_documents.delete(c,p,d)
+ if path=='/api/mc/documents/import':
+  result=mc_documents.import_file(c,p,d,reglages(c,p).get('workspace_dir'))
+  audit(c,p,'document_imported',{'id':result['item']['id'],'filename':result['item']['title'],'bytes':result['bytes']})
+  return result
  if path=='/api/mc/agent':
   name=required_text(d,'name',100);role=required_text(d,'role',40)
   if not role_valide(c,p,role):raise ValueError('Rôle inconnu')
@@ -1128,6 +1139,18 @@ class Handler(legacy.Handler):
      with connect() as c:project(c,p);self.reply(mc_documents.items(c,p))
     except (ValueError,KeyError) as e:self.reply({'error':str(e)},400)
     return
+   if self.path.startswith('/api/mc/documents/file?'):
+    from urllib.parse import parse_qs,urlsplit,quote
+    try:
+     q=parse_qs(urlsplit(self.path).query);p=int(q['project'][0]);i=int(q['id'][0])
+     with connect() as c:
+      project(c,p);path,name=mc_documents.local_file(c,p,i,reglages(c,p).get('workspace_dir'));body=path.read_bytes()
+     self.send_response(200);self.send_header('Content-Type','application/octet-stream')
+     self.send_header('Content-Disposition',"attachment; filename*=UTF-8''"+quote(name,safe=''))
+     self.send_header('Content-Length',str(len(body)));self.send_header('Cache-Control','no-store')
+     self.send_header('X-Content-Type-Options','nosniff');self.end_headers();self.wfile.write(body)
+    except (ValueError,KeyError,OSError) as e:self.reply({'error':str(e)},404)
+    return
    if self.path.startswith('/api/mc/context?'):
     from urllib.parse import parse_qs,urlsplit
     try:
@@ -1206,7 +1229,7 @@ class Handler(legacy.Handler):
   # des octets non lus fait perdre la reponse au client (RST sous Windows).
   try:n=int(self.headers.get('Content-Length','0'))
   except ValueError:n=0
-  limite=160000 if self.path=='/api/ollama' else 16000
+  limite=160000 if self.path=='/api/ollama' else 12*1024*1024 if self.path=='/api/mc/documents/import' else 16000
   if n<0 or n>limite:
    self.close_connection=True;return self._refus(413,'Taille invalide (limite %d octets)'%limite)
   corps=self.rfile.read(n) if n else b''

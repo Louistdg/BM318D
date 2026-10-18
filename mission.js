@@ -144,13 +144,14 @@ async function ouvrirReglages(){
   const r=await fetch('/api/mc/settings?project='+getProject(),{headers:entetes()});
   if(!r.ok)throw Error('Réglages indisponibles');
   const s=await r.json();
-  modal('Réglages','<p class="subtle">Le jeton administrateur reste dans logs\\admin-token.txt sur cette machine. Le serveur ne le renvoie pas. Saisi ici, il reste seulement en mémoire pour cette page.</p><label>Jeton administrateur</label><input id="mcSetAdmin" type="password" autocomplete="current-password" placeholder="'+(jetonAdmin?'déjà en mémoire pour cette page':'coller le jeton local')+'"><p class="subtle">Les réglages sont enregistrés par projet. Le port et le dossier des workspaces demandent un redémarrage.</p>'
+  modal('Réglages','<p class="subtle">Le jeton administrateur reste dans logs\\admin-token.txt sur cette machine. Le serveur ne le renvoie pas. Saisi ici, il reste seulement en mémoire pour cette page.</p><label>Jeton administrateur</label><input id="mcSetAdmin" type="password" autocomplete="current-password" placeholder="'+(jetonAdmin?'déjà en mémoire pour cette page':'coller le jeton local')+'"><p class="subtle">Ces réglages s’appliquent au projet sélectionné. Les fichiers de travail seront créés sur ton PC, dans des sous-dossiers propres au projet et à chaque job.</p>'
    +'<label>Adresse Ollama</label><input id="mcSetUrl" value="'+esc(s.ollama_url)+'">'
    +'<label>Modèle par défaut</label><input id="mcSetModel" value="'+esc(s.ollama_model)+'">'
    +'<label>Jobs simultanés (vide = selon la mémoire)</label><input id="mcSetJobs" value="'+esc(s.max_jobs)+'">'
    +'<label>Sauvegarde automatique (minutes, 0 = arrêtée)</label><input id="mcSetBackup" value="'+esc(s.auto_backup_minutes)+'">'
-   +'<label>Dossier des workspaces</label><input value="'+esc(s.workspace_dir)+'" disabled>',async()=>{
+   +'<label>Dossier local du projet (disque C: ou D:)</label><input id="mcSetWorkspace" value="'+esc(s.workspace_dir)+'" maxlength="1024" autocomplete="off"><p class="subtle">BM318d créera ici les dossiers du projet et de ses travaux. Les imports seront copiés dans cet espace ; l’original restera à son emplacement.</p>',async()=>{
     const saisi=$('mcSetAdmin').value.trim();if(saisi)memoriserJeton(saisi);
+    await post('settings',{key:'workspace_dir',value:$('mcSetWorkspace').value});
     await post('settings',{key:'ollama_url',value:$('mcSetUrl').value});
     await post('settings',{key:'ollama_model',value:$('mcSetModel').value});
     await post('settings',{key:'max_jobs',value:$('mcSetJobs').value});
