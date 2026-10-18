@@ -21,7 +21,7 @@ PORT=int(os.environ.get('MC_PORT') or 31880)
 TOKEN=os.environ.get('MC_TOKEN') or secrets.token_urlsafe(24)
 ORIGINES={'http://127.0.0.1:%d'%PORT,'http://localhost:%d'%PORT}
 LIMITE=int(os.environ.get('MC_RATE_LIMIT') or 60)  # requetes POST par minute
-_fenetre=[0.0,0]
+_fenetres={}
 LOCK=threading.RLock()
 ROLES=('manager','architect','frontend','backend','database','tester','auditor','security','documentation','specialist')
 STATUSES=('idle','working','blocked','done','paused','archived')
@@ -36,15 +36,23 @@ def connect():
  c.execute('PRAGMA busy_timeout=20000')
  return c
 def init():
+ # Create legacy canvas tables on a clean install, preserving existing rows.
+ with connect() as c:
+  c.executescript("""
+  CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY, name TEXT NOT NULL, created TEXT DEFAULT CURRENT_TIMESTAMP);
+  CREATE TABLE IF NOT EXISTS tasks(id INTEGER PRIMARY KEY, project_id INTEGER, title TEXT, priority TEXT, agent TEXT, status TEXT DEFAULT 'todo', created TEXT DEFAULT CURRENT_TIMESTAMP);
+  CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY, project_id INTEGER, created TEXT DEFAULT CURRENT_TIMESTAMP, agent TEXT, status TEXT, message TEXT);
+  CREATE TABLE IF NOT EXISTS task_dependencies(task_id INTEGER NOT NULL,depends_on INTEGER NOT NULL,PRIMARY KEY(task_id,depends_on));
+  CREATE TABLE IF NOT EXISTS canvas_positions(project_id INTEGER NOT NULL,task_id INTEGER PRIMARY KEY,x INTEGER NOT NULL,y INTEGER NOT NULL);
+  """)
+  if not c.execute('SELECT 1 FROM projects LIMIT 1').fetchone():c.execute("INSERT INTO projects(name) VALUES('Mon premier projet')")
  # One coherent SQLite backup before the first additive V2.2 migration.
  with connect() as probe:
   needs_v22=not probe.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mc_connectors'").fetchone()
- with connect() as probe:
   needs_documents=not probe.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mc_documents'").fetchone()
- if needs_v22 and DB.exists():
-  sauvegarder(DB.parent/'backups'/('v22-before-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.sqlite3'))
- if needs_documents and DB.exists():
-  sauvegarder(DB.parent/'backups'/('before-documents-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.sqlite3'))
+ if DB.exists() and (needs_v22 or needs_documents):
+  prefix='v22-before-' if needs_v22 else 'before-documents-'
+  sauvegarder(DB.parent/'backups'/(prefix+datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.sqlite3'))
  with connect() as c:
   c.executescript("""
   CREATE TABLE IF NOT EXISTS mc_agents(
@@ -169,6 +177,7 @@ def init():
 
 def sauvegarder(destination=None):
  # Copie en ligne (API backup de SQLite) : coherente meme si le serveur ecrit.
+ if not DB.is_file():return None
  destination=Path(destination) if destination else ROOT/'backups'/('bm318d-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'.sqlite3')
  destination.parent.mkdir(parents=True,exist_ok=True)
  source=sqlite3.connect(DB,timeout=20);cible=sqlite3.connect(destination)
@@ -411,7 +420,20 @@ def job_tester(c,p,i,d):
   raise ValueError('On ne teste pas un travail non appliqué (statut '+j['status']+')')
  if not j['workspace']:raise ValueError('Workspace absent')
  racine=Path(j['workspace'])
- resultat=mc_agent.executer_commande(racine,required_text(d,'command',40),d.get('file'))
+ commande=required_text(d,'command',40)
+ fichier=d.get('file')
+ if commande in ('py_compile','node_check'):
+  fichier=required_text(d,'file',500)
+  cible=mc_agent.chemin_sur(racine,fichier)
+  if not cible.is_file():raise ValueError('Le fichier à vérifier doit exister dans le workspace')
+ elif commande=='unittest':
+  tests=list(racine.rglob('test*.py'))+list(racine.rglob('*_test.py'))
+  if not tests:raise ValueError('Aucun fichier de test trouvé dans le workspace')
+  if fichier is not None and mc_agent.chemin_sur(racine,fichier) not in tests:raise ValueError('Le fichier fourni n’est pas un fichier de test du workspace')
+ resultat=mc_agent.executer_commande(racine,commande,fichier)
+ if commande=='unittest' and resultat['exit_code']==0 and not re.search(r'Ran\s+[1-9]\d*\s+tests?',resultat.get('stdout','')+'\n'+resultat.get('stderr','')):
+  resultat['exit_code']=2
+  resultat['stderr']=(resultat.get('stderr','')+'\nAucun test exécuté : preuve refusée').strip()
  resultat['at']=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
  resultat['job_id']=j['id']
  preuve=json.dumps(resultat,ensure_ascii=False)
@@ -453,10 +475,11 @@ def job_valider(c,p,d):
  except ValueError:preuve={}
  if preuve.get('exit_code')!=0:
   raise ValueError('Aucun test réussi enregistré : lance d’abord « Lancer les tests »')
- revues=rows(c,'SELECT kind,verdict FROM mc_reviews WHERE job_id=?',(j['id'],))
- if not revues:raise ValueError('Aucune revue enregistrée : demande une revue avant de valider')
+ revues=rows(c,'SELECT kind,verdict,agent_id FROM mc_reviews WHERE job_id=?',(j['id'],))
  mauvaises=[r['kind'] for r in revues if r['verdict']!='ok']
  if mauvaises:raise ValueError('Revue(s) en échec : '+', '.join(mauvaises))
+ if not any(r['kind'] in ('code','securite') for r in revues):raise ValueError('Aucune revue de code enregistrée')
+ if not any(r['kind']=='tests' and r['agent_id'] is None for r in revues):raise ValueError('Une revue humaine des tests est requise avant validation')
  maintenant=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
  c.execute("UPDATE mc_jobs SET status='completed',finished_at=CURRENT_TIMESTAMP WHERE id=?",(j['id'],))
  journal(c,j['id'],'validé : tests verts et revues favorables')
@@ -703,7 +726,7 @@ def charge_agents(c,p):
 
 # --- P7 : application, reglages, recherche, sauvegardes ----------------------
 SERVEUR=[None]
-VERSION='2.2.0'
+VERSION='2.5.1'
 MAX_TEXTE=200000
 MAX_PREUVE=8000
 ADMIN_TOKEN=os.environ.get('MC_ADMIN_TOKEN') or secrets.token_urlsafe(24)
@@ -797,7 +820,9 @@ def boucle_sauvegardes(minutes):
 
 def _dispatch(c,path,d):
  mc_security.authorize_route(c,path,d)
- p=int(d.get('project',0));project(c,p)
+ p=int(d.get('project',0))
+ if path not in ('/api/mc/shutdown','/api/mc/backups','/api/mc/security/revoke'):
+  project(c,p)
  if path=='/api/mc/security/token':
   a=agent(c,p,int(d['agent_id']))
   if a['status']=='archived':raise ValueError('Agent archivé')
@@ -1046,9 +1071,16 @@ class Handler(legacy.Handler):
  def _limite_ok(self):
   with LOCK:
    maintenant=time.monotonic()
-   if maintenant-_fenetre[0]>=60:_fenetre[0]=maintenant;_fenetre[1]=0
-   if _fenetre[1]>=LIMITE:return False
-   _fenetre[1]+=1;return True
+   identite=(self.principal.kind,self.principal.agent)
+   route=self.path.split('?',1)[0]
+   cle=(identite,route)
+   debut,compte=_fenetres.get(cle,(maintenant,0))
+   if maintenant-debut>=60:debut,compte=maintenant,0
+   sensibles=('/api/mc/job/run','/api/mc/backup','/api/mc/restore','/api/mc/shutdown')
+   limite=max(3,LIMITE//6) if route in sensibles or route.startswith('/api/mc/connectors/') else LIMITE
+   if compte>=limite:return False
+   _fenetres[cle]=(debut,compte+1)
+   return True
  def _refus(self,code,message):
   b=json.dumps({'error':message},ensure_ascii=False).encode()
   self.send_response(code);self.send_header('Content-Type','application/json; charset=utf-8')
@@ -1174,8 +1206,9 @@ class Handler(legacy.Handler):
   # des octets non lus fait perdre la reponse au client (RST sous Windows).
   try:n=int(self.headers.get('Content-Length','0'))
   except ValueError:n=0
-  if n<0 or n>16000:
-   self.close_connection=True;return self._refus(400,'Taille invalide')
+  limite=160000 if self.path=='/api/ollama' else 16000
+  if n<0 or n>limite:
+   self.close_connection=True;return self._refus(413,'Taille invalide (limite %d octets)'%limite)
   corps=self.rfile.read(n) if n else b''
   if not self._api_autorisee():return
   if not self._limite_ok():return self._refus(429,'Trop de requêtes : patientez une minute')

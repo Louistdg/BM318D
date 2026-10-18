@@ -146,6 +146,9 @@ try {
   await c.naviguer(base_url);
   await sleep(1200);
   t('aucune erreur JavaScript au chargement', c.erreurs().length === 0, c.erreurs());
+  await c.evaluate(`document.querySelector('.legacy-nav[data-page=\"overview\"]').click()`); await sleep(300);
+  t('la vue d’ensemble ne fabrique pas d’agents', await c.evaluate(`!/IA 1|Architecture|Développement|Audit/.test(document.getElementById('agentCards').textContent)`));
+  await c.evaluate(`document.querySelector('.legacy-nav[data-page=\"canvas\"]').click()`);
   t('la barre laterale a le bouton Mission Control', await c.evaluate(`!!document.querySelector('.rail button[data-page="mission"]')`));
   t('la page contient un jeton de session', await c.evaluate(`(document.querySelector('meta[name="mc-token"]')||{}).content||''`).then(v => (v || '').length > 20));
 
@@ -392,7 +395,7 @@ try {
   }
   await sleep(500);
   const boutonsJob = await c.evaluate(`(() => [...document.querySelectorAll('[data-job]')].map(b => b.textContent))()`);
-  t('les boutons de revue apparaissent', ['Audit sécu','Revue code','Valider','Commit','Rapport'].every(x => boutonsJob.includes(x)), boutonsJob);
+  t('les boutons de revue apparaissent', ['Audit sécu','Revue code','Revue tests (humaine)','Valider','Commit','Rapport'].every(x => boutonsJob.includes(x)), boutonsJob);
 
   await c.evaluate(`(() => { const s=document.getElementById('mcActeur'); if(s && s.options.length) s.value=s.options[0].value; })()`);
   await c.evaluate(`(() => { const b=[...document.querySelectorAll('[data-job]')].find(x=>x.textContent==='Audit sécu'); if(b) b.click(); })()`);
@@ -405,6 +408,8 @@ try {
   })()`);
   t('l\'audit de securite enregistre une revue', revues >= 1, revues);
 
+  await c.evaluate(`(() => { window.confirm=()=>true; const b=[...document.querySelectorAll('[data-job]')].find(x=>x.textContent==='Revue tests (humaine)'); if(b) b.click(); })()`);
+  await sleep(900);
   await c.evaluate(`(() => { const b=[...document.querySelectorAll('[data-job]')].find(x=>x.textContent==='Valider'); if(b) b.click(); })()`);
   await sleep(2600);
   const statutJob = await c.evaluate(`(async () => {

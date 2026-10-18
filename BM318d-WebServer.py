@@ -76,7 +76,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
  def do_POST(self):
   try:
    n=int(self.headers.get('Content-Length','0'))
-   if n<1 or n>16000:raise ValueError('Invalid size')
+   limite=300000 if self.path=='/api/ollama' else 16000
+   if n<1 or n>limite:raise ValueError('Invalid size')
    d=json.loads(self.rfile.read(n))
    if self.path=='/api/project':
     name=str(d['name']).strip()[:120]
@@ -115,15 +116,29 @@ class Handler(http.server.BaseHTTPRequestHandler):
     if not message or not agent or status not in ('working','blocked','done','idle') or not db('SELECT 1 FROM projects WHERE id=?',(p,)):raise ValueError('Invalid event')
     result=db('INSERT INTO events(project_id,agent,status,message) VALUES(?,?,?,?)',(p,agent,status,message),True)
    elif self.path=='/api/ollama':
-    p=int(d['project']);prompt=str(d['prompt']).strip()[:5000]
-    if not prompt or not db('SELECT 1 FROM projects WHERE id=?',(p,)):raise ValueError('Invalid prompt')
+    p=int(d['project']);prompt=str(d.get('prompt') or '').strip()
+    if len(prompt)>120000:raise ValueError('Prompt trop volumineux (120 000 caractères maximum)')
+    if not prompt and not d.get('history'):raise ValueError('Invalid prompt')
+    if not db('SELECT 1 FROM projects WHERE id=?',(p,)):raise ValueError('Invalid prompt')
     modele_choisi=str(d.get('model') or '').strip()[:80]
     if modele_choisi and modele_choisi not in modeles_installes():raise ValueError('Modele non installe : '+modele_choisi)
     db('INSERT INTO events(project_id,agent,status,message) VALUES(?,?,?,?)',(p,'Ollama','working','Mission: '+prompt[:1800]),True)
     try:
-     payload=json.dumps({'model':modele_choisi or modele_ollama(p),'keep_alive':'30m','stream':False,'messages':[{'role':'system','content':'Assistant de développement en lecture seule. Ne prétends pas avoir modifié des fichiers ni exécuté des tests. '
+     messages=[{'role':'system','content':'Assistant de développement en lecture seule. Ne prétends pas avoir modifié des fichiers ni exécuté des tests. '
                'Contexte réel du projet, seul fiable : '+contexte_projet(p)+'. '
-               'Si une information demandée n est pas dans ce contexte, dis clairement que tu ne sais pas.'},{'role':'user','content':prompt}],'options':{'num_predict':300}}).encode()
+               'Si une information demandée n est pas dans ce contexte, dis clairement que tu ne sais pas.'}]
+     historique=d.get('history')
+     if historique is not None:
+      if not isinstance(historique,list) or len(historique)>12:raise ValueError('Historique de conversation invalide')
+      total=0
+      for message in historique:
+       if not isinstance(message,dict) or message.get('role') not in ('user','assistant') or not isinstance(message.get('content'),str):raise ValueError('Message historique invalide')
+       contenu=message['content']
+       total+=len(contenu)
+       if len(contenu)>120000 or total>120000:raise ValueError('Historique de conversation trop volumineux')
+       messages.append({'role':message['role'],'content':contenu})
+     else:messages.append({'role':'user','content':prompt})
+     payload=json.dumps({'model':modele_choisi or modele_ollama(p),'keep_alive':'30m','stream':False,'messages':messages,'options':{'num_predict':1200}}).encode()
      req=urllib.request.Request('http://127.0.0.1:11434/api/chat',data=payload,headers={'Content-Type':'application/json'})
      with urllib.request.urlopen(req,timeout=120) as r:answer=json.load(r).get('message',{}).get('content','').strip()
      if not answer:raise ValueError('Réponse vide')

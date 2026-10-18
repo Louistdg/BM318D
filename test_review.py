@@ -78,6 +78,8 @@ ok('le constat nomme le fichier et la ligne', any(c['fichier'] == 'module.py' an
 constats = mc_agent.analyser_diff('+++ b/x.py\n@@ -0,0 +1,2 @@\n+eval("1+1")\n+ok = True\n')
 ok('eval est détecté', len(constats) == 1 and 'eval' in constats[0]['probleme'], constats)
 ok('un diff sain ne produit aucun constat', mc_agent.analyser_diff('+++ b/x.py\n+print(1)\n') == [])
+js_constats=mc_agent.analyser_diff('+++ b/x.js\n@@ -0,0 +1,2 @@\n+node.innerHTML = value\n+require(\"child_process\").execSync(\"whoami\")\n')
+ok('la revue de motifs signale les risques JavaScript', any('innerHTML' in x['probleme'] for x in js_constats) and any('Node.js' in x['probleme'] for x in js_constats), js_constats)
 
 print('\n=== revue de code et validation ===')
 revue = appel('/api/mc/review', job_id=job, agent_id=agent2, kind='code', verdict='ok', findings=['RAS'])
@@ -93,6 +95,12 @@ with mc.connect() as c:
 (racine / 'test_module.py').write_text(
     'import unittest\nfrom module import f\n\nclass T(unittest.TestCase):\n    def test_f(self):\n        self.assertEqual(f(), 1)\n', encoding='utf-8')
 appel('/api/mc/job/test', id=job, command='unittest', agent_id=agent)
+try:
+    appel('/api/mc/job/validate', id=job, agent_id=agent)
+    ok('validation refusée sans revue humaine des tests', False)
+except ValueError as e:
+    ok('validation refusée sans revue humaine des tests', 'humaine' in str(e).lower(), str(e))
+appel('/api/mc/review', job_id=job, kind='tests', verdict='ok', findings=['Tests examinés par un opérateur'])
 resultat = appel('/api/mc/job/validate', id=job, agent_id=agent)
 ok('un travail testé et revu est validé', resultat['verification'] == 'validated', resultat)
 with mc.connect() as c:

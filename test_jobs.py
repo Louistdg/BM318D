@@ -102,6 +102,25 @@ try:
 except ValueError:
     ok('approuver un job refuse echoue', True)
 
+print('\n=== preuves de test non vides ===')
+try:
+    appel('/api/mc/job/test', id=identifiant, command='py_compile', agent_id=agent)
+    ok('py_compile sans fichier est refusé', False)
+except ValueError as e:
+    ok('py_compile sans fichier est refusé', 'file' in str(e).lower(), str(e))
+try:
+    appel('/api/mc/job/test', id=identifiant, command='unittest', agent_id=agent)
+    ok('unittest sans fichier de test est refusé', False)
+except ValueError as e:
+    ok('unittest sans fichier de test est refusé', 'test' in str(e).lower(), str(e))
+(racine / 'test_vide.py').write_text('# suite vide\n', encoding='utf-8')
+original_executer = mc_agent.executer_commande
+mc_agent.executer_commande = lambda *a, **k: {'command':'python -m unittest -v','exit_code':0,'stdout':'','stderr':'Ran 0 tests in 0.000s\nOK','duration_ms':0,'isolement':{}}
+preuve_vide = appel('/api/mc/job/test', id=identifiant, command='unittest', agent_id=agent)
+ok('suite vide ne produit pas une preuve verte', preuve_vide['evidence']['exit_code'] != 0, preuve_vide)
+mc_agent.executer_commande = original_executer
+(racine / 'test_vide.py').unlink()
+
 print('\n=== securite des chemins ===')
 cas = [
     ('remontee de dossier', {'files': [{'path': '../evasion.py', 'content': 'x=1'}]}, 'Remont'),

@@ -55,7 +55,8 @@ function remplirActeurs(){
 }
 async function agirSurJob(id,action){
  try{
-  if(action==='review_secu'){const r=await post('review',{job_id:id,agent_id:acteurId(),kind:'securite'});toast(r.verdict==='ok'?'Audit sécurité : rien à signaler':('Audit sécurité : '+r.findings.length+' constat(s)'))}
+  if(action==='review_tests'){if(!confirm('Confirme que tu as examiné les résultats des tests et qu’ils vérifient bien le changement ?'))return;await post('review',{job_id:id,kind:'tests',verdict:'ok',findings:['Résultats examinés et jugés pertinents par l’opérateur']});toast('Revue humaine des tests enregistrée')}
+  else if(action==='review_secu'){const r=await post('review',{job_id:id,agent_id:acteurId(),kind:'securite'});toast(r.verdict==='ok'?'Audit sécurité : rien à signaler':('Audit sécurité : '+r.findings.length+' constat(s)'))}
   else{await post('job/'+action,{id,agent_id:acteurId()});toast('Job : '+action)}
   await refresh()
  }catch(e){toast(e.message)}
@@ -367,7 +368,7 @@ function renderRecords(){
   if(j.status==='paused')actions.push(['resume','Reprendre'],['reject','Refuser']);
   if(j.status==='proposed')actions.push(['approve','Approuver'],['pause','Pause'],['reject','Refuser'],['diff','Voir le diff']);
   if(j.status==='approved')actions.push(['test','Lancer les tests'],['diff','Voir le diff']);
-  if(j.status==='approved'||j.status==='completed')actions.push(['review_secu','Audit sécu'],['review_code','Revue code'],['validate','Valider'],['commit','Commit'],['report','Rapport']);
+  if(j.status==='approved'||j.status==='completed')actions.push(['review_secu','Audit sécu'],['review_code','Revue code'],['review_tests','Revue tests (humaine)'],['validate','Valider'],['commit','Commit'],['report','Rapport']);
   return '<div class="mc-record"><b>'+esc(j.title)+'</b> · '+esc(nom)+'<p>'+esc(j.task)+'</p><small>'+esc(j.status)+(j.error?' — '+esc(j.error):'')+' · modèle '+esc(j.model)+' · '+esc(libellePreuve((data.assignments.find(x=>x.id===j.assignment_id)||{}).verification||'none'))+'</small><p class="subtle">Approuver écrit la proposition dans le dossier isolé. Valider exige un test réussi et des revues. Commit écrit un commit git, à part.</p><p>'+actions.map(x=>'<button data-job="'+j.id+'" data-action="'+x[0]+'">'+esc(x[1])+'</button>').join(' ')+'</p><details><summary>Journal</summary><pre style="white-space:pre-wrap">'+esc(j.log||'—')+'</pre></details></div>';
  }).join('');
  const plans=(data.plans||[]).map(p=>'<div class="mc-record"><b>'+esc(p.objective)+'</b><small>'+esc(p.status)+' · '+esc(p.created_at)+'</small>'+(p.status==='proposed'?'<p><button data-plan="'+p.id+'">Appliquer</button></p>':'')+'</div>').join('');
