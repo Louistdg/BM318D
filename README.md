@@ -24,7 +24,7 @@ Use a disposable copy and temporary databases for tests. Review the command and 
 
 ## Collaboration
 
-For Grok’s first task, connect only this repository and use the read-only review prompt in `GROK-MISSION-01-PRODUCT-AUDIT.md`. Ask for proposed changes as findings; do not authorize commits or edits during the discovery review.
+The initial discovery review is recorded in `GROK-MISSION-01-PRODUCT-AUDIT.md`. Implementation now proceeds on feature branches with pull requests and test evidence. See [`docs/DELIVERY-V24.md`](docs/DELIVERY-V24.md) for the integrated changes, verification and local installation model.
 
 ## Parcours
 
