@@ -40,16 +40,19 @@ def main():
         print('Arrêt non confirmé : jeton administrateur absent. Le service tourne encore.')
         return 1
     session = trouve.group(1)
-    projet = 1
     try:
         etat_req = urllib.request.Request(URL + 'api/state', headers={'X-MC-Token': session})
         with urllib.request.urlopen(etat_req, timeout=5) as r:
             etat = json.loads(r.read().decode('utf-8', 'replace'))
         projets = etat.get('projects') or []
-        if projets and projets[0]:
-            projet = int(projets[0][0])
-    except Exception:
-        projet = 1
+        projet = projets[0][0]
+        if type(projet) is not int or projet <= 0:
+            raise ValueError('Projet invalide')
+    except Exception as e:
+        if isinstance(e, urllib.error.HTTPError):
+            e.close()
+        print('Arrêt non confirmé : projet indisponible. Réessayez après rétablissement du service.')
+        return 1
     requete = urllib.request.Request(URL + 'api/mc/shutdown',
                                      data=json.dumps({'project': projet}).encode(),
                                      headers={'Content-Type': 'application/json',

@@ -64,19 +64,22 @@ def _texte_erreur(e):
 
 
 def projet_connu():
-    j = jeton()
-    if not j:
-        return 1
-    requete = urllib.request.Request(URL + 'api/state', headers={'X-MC-Token': j})
     try:
+        j = jeton()
+        if not j:
+            raise ValueError('Session absente')
+        requete = urllib.request.Request(URL + 'api/state', headers={'X-MC-Token': j})
         with urllib.request.urlopen(requete, timeout=4) as r:
             etat = json.loads(r.read().decode('utf-8', 'replace'))
         projets = etat.get('projects') or []
-        if projets and projets[0]:
-            return int(projets[0][0])
-    except Exception:
-        pass
-    return 1
+        projet = projets[0][0]
+        if type(projet) is not int or projet <= 0:
+            raise ValueError('Projet invalide')
+        return projet
+    except Exception as e:
+        if isinstance(e, urllib.error.HTTPError):
+            e.close()
+        raise RuntimeError('Projet indisponible : réessayer après rétablissement du service') from None
 
 
 def tenter_arret():
