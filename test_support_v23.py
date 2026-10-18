@@ -2,7 +2,7 @@
 import atexit,os,tempfile
 from pathlib import Path
 if not os.environ.get('MC_DB'):
-    _temporary=tempfile.TemporaryDirectory(prefix='bm318d-test-bootstrap-')
+    _temporary=tempfile.TemporaryDirectory(prefix='bm318d-test-bootstrap-',ignore_cleanup_errors=True)
     os.environ['MC_DB']=str(Path(_temporary.name)/'bootstrap.sqlite3')
     atexit.register(_temporary.cleanup)
 

@@ -56,10 +56,14 @@ def modele_ollama(projet):
  return nom
 
 def db(q,a=(),write=False):
- with sqlite3.connect(DB,timeout=15) as c:
-  c.execute('PRAGMA busy_timeout=15000')
-  r=c.execute(q,a)
-  return r.lastrowid if write else r.fetchall()
+ c=sqlite3.connect(DB,timeout=15)
+ try:
+  with c:
+   c.execute('PRAGMA busy_timeout=15000')
+   r=c.execute(q,a)
+   return r.lastrowid if write else r.fetchall()
+ finally:
+  c.close()
 db('CREATE TABLE IF NOT EXISTS task_dependencies(task_id INTEGER NOT NULL,depends_on INTEGER NOT NULL,PRIMARY KEY(task_id,depends_on))',write=True)
 db('CREATE TABLE IF NOT EXISTS canvas_positions(project_id INTEGER NOT NULL,task_id INTEGER PRIMARY KEY,x INTEGER NOT NULL,y INTEGER NOT NULL)',write=True)
 class Handler(http.server.BaseHTTPRequestHandler):

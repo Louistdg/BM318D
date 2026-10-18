@@ -182,9 +182,12 @@ def sauvegarder(destination=None, *, inclure_imports=True):
  if not DB.is_file():return None
  destination=Path(destination) if destination else ROOT/'backups'/('bm318d-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'.sqlite3')
  destination.parent.mkdir(parents=True,exist_ok=True)
- source=sqlite3.connect(DB,timeout=20);cible=sqlite3.connect(destination)
- try:source.backup(cible)
- finally:cible.close();source.close()
+ source=sqlite3.connect(DB,timeout=20)
+ try:
+  cible=sqlite3.connect(destination)
+  try:source.backup(cible)
+  finally:cible.close()
+ finally:source.close()
  if inclure_imports:
   mc_documents.backup_imports(destination,destination.with_suffix('.imports.zip'))
  return destination
