@@ -16,6 +16,9 @@ const CHROME = process.env.CHROME_PATH || (process.platform === 'win32'
       .find(p => fs.existsSync(p)) || '');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let passes = 0, echecs = 0;
+let refus400Attendus = 0;
+const aucuneErreurInattendue = c => c.erreurs().every(e => /status of 400/i.test(e)) &&
+  c.events.filter(e => e.method === 'Log.entryAdded' && e.params.entry.level === 'error' && /status of 400/i.test(e.params.entry.text)).length === refus400Attendus;
 const t = (nom, ok, detail) => {
   if (ok) { passes++; console.log('  ok    ' + nom); }
   else { echecs++; console.log('  ECHEC ' + nom + (detail !== undefined ? '  -> ' + JSON.stringify(detail).slice(0, 300) : '')); }
@@ -441,7 +444,9 @@ try {
     const s=await (await fetch('/api/mc/state?project='+p,{headers:{'X-MC-Token':t}})).json();
     return (s.jobs||[])[0].status;
   })()`);
-  t('le bouton Valider termine le job', statutJob === 'completed', statutJob);
+  t('le bouton Valider refuse un job simulé sans source livrée', statutJob === 'approved', statutJob);
+  refus400Attendus = c.events.filter(e => e.method === 'Log.entryAdded' && e.params.entry.level === 'error' && /status of 400/i.test(e.params.entry.text)).length;
+  t('le refus de validation est visible comme HTTP 400', refus400Attendus === 1, refus400Attendus);
 
   console.log('\n=== roles, duplication, recrutement ===');
   await c.evaluate(`document.getElementById('mcRol').click()`);
@@ -573,7 +578,7 @@ try {
   if (projets.length > 1) {
     await c.evaluate(`(() => { const s=document.getElementById('project'); s.value='${projets[projets.length - 1]}'; s.dispatchEvent(new Event('change')); })()`);
     await sleep(1200);
-    t('le changement de projet ne casse pas la page', c.erreurs().length === 0, c.erreurs());
+    t('le changement de projet ne casse pas la page', aucuneErreurInattendue(c), c.erreurs());
   } else {
     console.log('  (un seul projet dans la base isolee : changement non testable)');
   }
@@ -586,7 +591,7 @@ try {
   t('la navigation mobile ouvre la vue demandée et replie le panneau', await c.evaluate(`document.getElementById('overview').classList.contains('active') && !document.body.classList.contains('sidebar-mobile-open')`));
 
   console.log('\n=== fin ===');
-  t('aucune erreur JavaScript a la fin', c.erreurs().length === 0, c.erreurs());
+  t('aucune erreur JavaScript inattendue a la fin', aucuneErreurInattendue(c), c.erreurs());
 } finally {
   if (c) { try { await Promise.race([c.send('Browser.close'), sleep(2000)]); } catch {} }
   chrome.kill();
