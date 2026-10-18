@@ -392,6 +392,12 @@ def job_annuler(c,p,i):
  audit(c,p,'job_cancelled',{'id':i})
  return {'ok':True}
 
+def auteur_preuve():
+ """Principal authentifié, jamais le nom envoyé par le client."""
+ identite=mc_security.current()
+ if identite.kind=='agent' and identite.agent:return 'agent:%d'%identite.agent
+ return identite.kind
+
 def job_tester(c,p,i,d):
  acteur(c,p,d,'can_run_tests')
  j=job_publie(c,p,i)
@@ -409,7 +415,7 @@ def job_tester(c,p,i,d):
  if statut!=j['status']:c.execute("UPDATE mc_jobs SET status='completed' WHERE id=?",(i,))
  journal(c,i,'test %s → code %s (%s ms)'%(resultat['command'],resultat['exit_code'],resultat['duration_ms']))
  if j['assignment_id'] and resultat['exit_code']==0:
-  c.execute("UPDATE mc_assignments SET verification='test',verified=1,evidence=?,verified_at=? WHERE id=?",(preuve,resultat['at'],j['assignment_id']))
+  c.execute("UPDATE mc_assignments SET verification='test',verified=1,evidence=?,verified_at=?,verified_by=? WHERE id=?",(preuve,resultat['at'],auteur_preuve(),j['assignment_id']))
  audit(c,p,'job_tested',{'id':i,'command':resultat['command'],'exit_code':resultat['exit_code']})
  return {'evidence':resultat,'status':statut}
 
@@ -449,7 +455,7 @@ def job_valider(c,p,d):
  c.execute("UPDATE mc_jobs SET status='completed',finished_at=CURRENT_TIMESTAMP WHERE id=?",(j['id'],))
  journal(c,j['id'],'validé : tests verts et revues favorables')
  if j['assignment_id']:
-  c.execute("UPDATE mc_assignments SET verification='validated',verified=1,evidence=?,verified_at=? WHERE id=?",(j['evidence'],maintenant,j['assignment_id']))
+  c.execute("UPDATE mc_assignments SET verification='validated',verified=1,evidence=?,verified_at=?,verified_by=? WHERE id=?",(j['evidence'],maintenant,auteur_preuve(),j['assignment_id']))
  audit(c,p,'job_validated',{'id':j['id'],'revues':[r['kind'] for r in revues]})
  return {'ok':True,'verification':'validated'}
 
@@ -867,17 +873,15 @@ def _dispatch(c,path,d):
   if 'verification' in d:verification=str(d['verification'])
   elif d.get('verified') is True:verification='human' if status=='reviewed' else a['verification']
   if verification not in ('none','declared','human','test','approved','validated'):raise ValueError('Niveau de vérification inconnu')
+  if verification in ('validated','approved'):
+   raise ValueError('Validation refusée : seul le serveur peut valider après un test exécuté et des revues')
   if verification in ('human','test','approved','validated') and status not in ('done','reviewed'):raise ValueError('On ne vérifie pas un travail encore en cours')
   evidence=a['evidence']
-  if 'evidence' in d:
-   if not isinstance(d['evidence'],dict):raise ValueError('Preuve invalide')
-   evidence=json.dumps(d['evidence'],ensure_ascii=False)[:8000]
-  if verification in ('test','validated'):
-   try:prouve=json.loads(evidence or '{}')
-   except ValueError:prouve={}
+  if verification=='test':
+   if 'evidence' not in d or not isinstance(d['evidence'],dict):raise ValueError('Preuve invalide')
+   prouve=d['evidence']
    if not str(prouve.get('command','')).strip() or not isinstance(prouve.get('exit_code'),int):
     raise ValueError('Preuve de test incomplète : commande et code de sortie (entier) requis')
-   # La preuve doit venir d'un job réellement appliqué de ce projet.
    identifiant_job=prouve.get('job_id')
    if not isinstance(identifiant_job,int):
     raise ValueError('Preuve refusée : elle doit citer le job (job_id) qui l’a produite')
@@ -886,9 +890,19 @@ def _dispatch(c,path,d):
     raise ValueError('Preuve refusée : le job '+str(identifiant_job)+' n’est pas appliqué')
    if job_source['assignment_id'] not in (None,a['id']):
     raise ValueError('Preuve refusée : elle appartient à une autre attribution')
-  verified=1 if verification in ('human','test','approved','validated') else 0
+   try:stockee=json.loads(job_source['evidence'] or '{}')
+   except ValueError:stockee={}
+   if stockee.get('command')!=prouve.get('command') or stockee.get('exit_code')!=prouve.get('exit_code') or stockee.get('job_id')!=identifiant_job:
+    raise ValueError('Preuve refusée : commande ou code de sortie différent du test exécuté')
+   if len(job_source['evidence'])>8000:raise ValueError('Preuve exécutée trop volumineuse')
+   evidence=job_source['evidence']
+  elif 'evidence' in d:
+   if not isinstance(d['evidence'],dict):raise ValueError('Preuve invalide')
+   evidence=json.dumps(d['evidence'],ensure_ascii=False)[:8000]
+  verified=1 if verification in ('human','test') else 0
   verifie_le=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds') if verified else a['verified_at']
-  c.execute('UPDATE mc_assignments SET status=?,result=?,verified=?,verification=?,evidence=?,verified_at=? WHERE id=?',(status,result,verified,verification,evidence,verifie_le,a['id']))
+  verifie_par=auteur_preuve() if verified else None
+  c.execute('UPDATE mc_assignments SET status=?,result=?,verified=?,verification=?,evidence=?,verified_at=?,verified_by=? WHERE id=?',(status,result,verified,verification,evidence,verifie_le,verifie_par,a['id']))
   audit(c,p,'assignment_updated',{'id':a['id'],'status':status,'verification':verification,'verified':verified});return {'ok':True,'verification':verification}
  if path=='/api/mc/note':
   aid=d.get('agent_id');aid=int(aid) if aid not in ('',None) else None
