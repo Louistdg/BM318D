@@ -35,3 +35,5 @@ button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-vis
  .subhead{flex-wrap:wrap;height:auto;padding:8px}
  #agents .dash h2{white-space:normal}
 }
+#mission.view.active{display:flex;flex-direction:column;min-height:0}
+#mission .mc-stage,#mission #mcRecords{height:auto;flex:1 1 auto;min-height:0}
