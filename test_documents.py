@@ -190,5 +190,49 @@ class Documents(unittest.TestCase):
         finally:mc.DB=original
 
 
+    def test_backup_imports_restores_bytes_and_rejects_conflicts(self):
+        root=Path(_temp.name)/'archivage-projet'
+        with mc.connect() as c:
+            result=mc_documents.import_file(c,1,{'name':'archive.txt',
+                'data':base64.b64encode(b'contenu sauvegarde').decode()},root)
+        destination=Path(_temp.name)/'archives-test'/'snapshot.sqlite3'
+        mc.sauvegarder(destination)
+        archive=destination.with_suffix('.imports.zip')
+        self.assertTrue(archive.is_file())
+        target=root/result['item']['storage_path']
+        self.assertEqual(target.read_bytes(),b'contenu sauvegarde')
+        target.unlink()
+        self.assertEqual(mc_documents.restore_imports(destination,archive),1)
+        self.assertEqual(target.read_bytes(),b'contenu sauvegarde')
+        self.assertEqual(mc_documents.restore_imports(destination,archive),0)
+        target.write_bytes(b'autre contenu local')
+        with self.assertRaises(FileExistsError):
+            mc_documents.restore_imports(destination,archive)
+        self.assertEqual(target.read_bytes(),b'autre contenu local')
+        target.unlink()
+        with self.assertRaises(FileNotFoundError):
+            mc_documents.restore_imports(destination,archive.with_name('introuvable.zip'))
+
+
+    def test_full_restore_after_import_folder_is_lost(self):
+        root=Path(_temp.name)/'lost-imports'
+        with mc.connect() as c:
+            item=mc_documents.import_file(c,1,{'name':'essentiel.txt',
+                'data':base64.b64encode(b'donnees indispensables').decode()},root)['item']
+        previous_root=mc.ROOT
+        mc.ROOT=Path(_temp.name)
+        try:
+            backup=mc.sauvegarder()
+            target=root/item['storage_path']
+            self.assertTrue(backup.with_suffix('.imports.zip').is_file())
+            target.unlink()
+            with security.use(self.admin),mc.connect() as c:
+                result=mc.restaurer_sauvegarde(c,1,{'file':backup.name})
+            self.assertEqual(result['fichiers_restaures'],1)
+            self.assertEqual(target.read_bytes(),b'donnees indispensables')
+        finally:
+            mc.ROOT=previous_root
+
+
 if __name__ == '__main__':
     unittest.main()

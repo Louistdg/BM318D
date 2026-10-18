@@ -177,7 +177,7 @@ def init():
   mc_connectors.migrate(c)
   mc_documents.migrate(c)
 
-def sauvegarder(destination=None):
+def sauvegarder(destination=None, *, inclure_imports=True):
  # Copie en ligne (API backup de SQLite) : coherente meme si le serveur ecrit.
  if not DB.is_file():return None
  destination=Path(destination) if destination else ROOT/'backups'/('bm318d-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'.sqlite3')
@@ -185,6 +185,8 @@ def sauvegarder(destination=None):
  source=sqlite3.connect(DB,timeout=20);cible=sqlite3.connect(destination)
  try:source.backup(cible)
  finally:cible.close();source.close()
+ if inclure_imports:
+  mc_documents.backup_imports(destination,destination.with_suffix('.imports.zip'))
  return destination
 def rows(c,q,a=()):
  return [dict(r) for r in c.execute(q,a).fetchall()]
@@ -788,7 +790,8 @@ def historique(c,p,limite=80):
 def sauvegardes_disponibles():
  base=ROOT/'backups'
  if not base.exists():return []
- return [{'nom':f.name,'octets':f.stat().st_size,'quand':datetime.datetime.fromtimestamp(f.stat().st_mtime).isoformat(timespec='seconds')}
+ return [{'nom':f.name,'octets':f.stat().st_size,'quand':datetime.datetime.fromtimestamp(f.stat().st_mtime).isoformat(timespec='seconds'),
+          'fichiers_importes':f.with_suffix('.imports.zip').is_file()}
   for f in sorted(base.glob('*.sqlite3'),key=lambda x:x.stat().st_mtime,reverse=True)[:30]]
 
 def restaurer_sauvegarde(c,p,d):
@@ -797,13 +800,17 @@ def restaurer_sauvegarde(c,p,d):
  source=(base/nom).resolve()
  if source.parent!=base or not source.exists():
   raise ValueError('Sauvegarde introuvable dans backups/ : '+nom)
- securite=sauvegarder(ROOT/'backups'/('bm318d-avant-restauration-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'.sqlite3'))
+ securite=sauvegarder(ROOT/'backups'/('bm318d-avant-restauration-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'.sqlite3'),inclure_imports=False)
+ archive=source.with_suffix('.imports.zip')
+ # Validate ZIP content and local conflicts before replacing the database.
+ fichiers=mc_documents.restore_imports(source,archive)
  origine=sqlite3.connect(source);cible=sqlite3.connect(DB)
  try:origine.backup(cible)
  finally:cible.close();origine.close()
  init()  # Reapply additive migrations when restoring a pre-V2.2 database.
- audit(c,p,'database_restored',{'file':nom,'sauvegarde_prealable':securite.name})
- return {'ok':True,'sauvegarde_prealable':securite.name}
+ audit(c,p,'database_restored',{'file':nom,'sauvegarde_prealable':securite.name,'fichiers_restaures':fichiers})
+ return {'ok':True,'sauvegarde_prealable':securite.name,'fichiers_restaures':fichiers,
+         'avertissement':None if archive.is_file() else 'Sauvegarde ancienne sans archive de fichiers importés'}
 
 def demander_arret():
  threading.Thread(target=lambda: SERVEUR[0] and SERVEUR[0].shutdown(),daemon=True).start()

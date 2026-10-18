@@ -38,6 +38,154 @@ def migrate(c):
 
 IMPORT_MAX=8*1024*1024
 
+# A SQLite backup does not contain imported file bytes. Keep the companion
+# archive tied to its database snapshot; never follow a path outside imports.
+def _import_target(project, storage_root, storage_path):
+    root=Path(storage_root)
+    relative=Path(storage_path)
+    if not root.is_absolute() or relative.is_absolute() or '..' in relative.parts:
+        raise ValueError('Chemin de fichier importé invalide')
+    parts=relative.parts
+    if len(parts)<3 or parts[:2]!=('p%d'%project,'fichiers-importes'):
+        raise ValueError('Chemin hors des fichiers importés')
+    base=(root/parts[0]/parts[1]).resolve()
+    target=(root/relative).resolve()
+    if target.parent!=base and base not in target.parents:
+        raise ValueError('Fichier importé hors espace projet')
+    return target
+
+
+def _import_rows(snapshot):
+    c=sqlite3.connect(snapshot)
+    try:
+        cols={r[1] for r in c.execute('PRAGMA table_info(mc_documents)')}
+        if not {'id','project_id','deleted_at','storage_root','storage_path'}.issubset(cols):
+            # Snapshots created before the documents/import migration.
+            return []
+        return c.execute("""SELECT id,project_id,storage_root,storage_path
+            FROM mc_documents WHERE deleted_at IS NULL AND storage_path IS NOT NULL
+            ORDER BY id""").fetchall()
+    finally:
+        c.close()
+
+
+def backup_imports(snapshot, archive):
+    """Archive exactly the imported files referenced by the SQLite snapshot."""
+    import hashlib
+    import json
+    import tempfile
+    import zipfile
+
+    archive=Path(archive)
+    if archive.exists():
+        raise FileExistsError('Archive de sauvegarde déjà présente')
+    rows=_import_rows(snapshot)
+    with tempfile.NamedTemporaryFile(prefix='.imports-',suffix='.partial',
+                                     dir=archive.parent,delete=False) as tmp:
+        temporary=Path(tmp.name)
+    try:
+        manifest=[]
+        with zipfile.ZipFile(temporary,'w',compression=zipfile.ZIP_DEFLATED,
+                             allowZip64=True) as z:
+            for ident,project,root,relative in rows:
+                if not root or not relative:
+                    raise ValueError('Emplacement importé incomplet')
+                target=_import_target(project,root,relative)
+                if not target.is_file():
+                    raise FileNotFoundError('Fichier importé manquant : '+str(target))
+                entry='imports/%d-%d'%(project,ident)
+                digest=hashlib.sha256()
+                length=0
+                with target.open('rb') as source,z.open(entry,'w') as output:
+                    while block:=source.read(1024*1024):
+                        length+=len(block)
+                        if length>IMPORT_MAX:
+                            raise ValueError('Fichier importé trop volumineux')
+                        digest.update(block)
+                        output.write(block)
+                manifest.append({'id':ident,'project':project,'root':root,
+                                 'relative':relative,'entry':entry,
+                                 'size':length,'sha256':digest.hexdigest()})
+            z.writestr('manifest.json',json.dumps({'version':1,'files':manifest},
+                                                  ensure_ascii=False))
+        # No replacement of an existing backup archive.
+        if archive.exists():
+            raise FileExistsError('Archive de sauvegarde déjà présente')
+        temporary.rename(archive)
+        return len(manifest)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def restore_imports(snapshot, archive):
+    """Preflight every file, then restore absent bytes; never overwrite local files."""
+    import hashlib
+    import json
+    import zipfile
+
+    snapshot=Path(snapshot)
+    expected={(project,ident):(root,relative)
+              for ident,project,root,relative in _import_rows(snapshot)}
+    if not Path(archive).is_file():
+        if expected:
+            raise FileNotFoundError('Archive des fichiers importés absente : restauration refusée')
+        return 0
+    with zipfile.ZipFile(archive) as z:
+        data=z.read('manifest.json')
+        if len(data)>8*1024*1024:
+            raise ValueError('Manifeste de sauvegarde trop volumineux')
+        doc=json.loads(data)
+        if not isinstance(doc,dict) or doc.get('version')!=1 or not isinstance(doc.get('files'),list):
+            raise ValueError('Manifeste de sauvegarde invalide')
+        files=doc['files']
+        if len(files)!=len(expected):
+            raise ValueError('Fichiers de la sauvegarde incomplets')
+        seen=set()
+        pending=[]
+        names=set(z.namelist())
+        if names!={'manifest.json'}|{f.get('entry') for f in files if isinstance(f,dict)}:
+            raise ValueError('Contenu ZIP inattendu')
+        for f in files:
+            if not isinstance(f,dict):
+                raise ValueError('Entrée de sauvegarde invalide')
+            key=(f.get('project'),f.get('id'))
+            if key not in expected or key in seen:
+                raise ValueError('Fichier du manifeste non référencé par la base')
+            seen.add(key)
+            root,relative=expected[key]
+            entry='imports/%d-%d'%key
+            if (f.get('root'),f.get('relative'),f.get('entry'))!=(root,relative,entry):
+                raise ValueError('Archive différente de la base SQLite')
+            target=_import_target(key[0],root,relative)
+            size=f.get('size')
+            if type(size) is not int or size<0 or size>IMPORT_MAX:
+                raise ValueError('Taille du fichier archivé invalide')
+            if z.getinfo(entry).file_size!=size:
+                raise ValueError('Taille du ZIP incohérente')
+            digest=hashlib.sha256()
+            with z.open(entry) as source:
+                while block:=source.read(1024*1024):
+                    digest.update(block)
+            if digest.hexdigest()!=f.get('sha256'):
+                raise ValueError('Empreinte du fichier archivé invalide')
+            if target.exists():
+                if not target.is_file():
+                    raise ValueError('Emplacement de restauration occupé')
+                with target.open('rb') as existing:
+                    local=hashlib.file_digest(existing,'sha256').hexdigest()
+                if local!=f['sha256']:
+                    raise FileExistsError('Fichier local différent : '+str(target))
+            else:
+                pending.append((entry,target,key[0],root,relative))
+        for entry,target,project,root,relative in pending:
+            target.parent.mkdir(parents=True,exist_ok=True)
+            if _import_target(project,root,relative)!=target:
+                raise ValueError('Chemin restauré changé')
+            with z.open(entry) as source,target.open('xb') as output:
+                while block:=source.read(1024*1024):
+                    output.write(block)
+        return len(pending)
+
 def import_file(c, project, data, workspace_root):
     """Copy a user-selected file into the project workspace; SQLite keeps metadata only."""
     name=data.get('name')
