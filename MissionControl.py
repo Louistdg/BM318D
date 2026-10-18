@@ -837,7 +837,9 @@ def demander_arret():
 def rotation_sauvegardes(limite=10):
  base=ROOT/'backups'
  vieux=sorted(base.glob('bm318d-auto-*.sqlite3'),key=lambda x:x.stat().st_mtime,reverse=True)[limite:]
- for fichier in vieux:fichier.unlink(missing_ok=True)
+ for fichier in vieux:
+  fichier.unlink(missing_ok=True)
+  fichier.with_suffix('.imports.zip').unlink(missing_ok=True)
  return len(vieux)
 
 def boucle_sauvegardes(minutes):

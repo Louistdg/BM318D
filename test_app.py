@@ -109,9 +109,12 @@ with mc.connect() as c:
 ok('la liste des sauvegardes est lisible', any(b['nom'] == manuelle['file'] for b in liste), liste[:3])
 for i in range(12):
     (dossier / 'backups' / ('bm318d-auto-%02d.sqlite3' % i)).write_bytes(b'x')
+    (dossier / 'backups' / ('bm318d-auto-%02d.imports.zip' % i)).write_bytes(b'zip-test')
 supprimes = mc.rotation_sauvegardes(10)
 restants = len(list((dossier / 'backups').glob('bm318d-auto-*.sqlite3')))
 ok('la rotation ne garde que 10 sauvegardes automatiques', restants == 10 and supprimes == 2, {'restants': restants, 'supprimes': supprimes})
+archives = len(list((dossier / 'backups').glob('bm318d-auto-*.imports.zip')))
+ok('la rotation garde les archives ZIP associées', archives == 10, archives)
 
 print('\n=== restauration ===')
 with mc.connect() as c:
