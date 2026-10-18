@@ -4,16 +4,32 @@ const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,
 let data={agents:[],missions:[],assignments:[],handoffs:[],notes:[],links:[],jobs:[],audit:[]},chosen=null,mode='agents',pan={x:45,y:35},zoom=1,drag=null,modalCallback=null,tic=0,modelesOllama=[];
 const getProject=()=>Number(document.getElementById('project').value);
 const acteurId=()=>{const s=document.getElementById('mcActeur');return s&&s.value?Number(s.value):null};
-let jetonAdmin=sessionStorage.getItem('mc-admin')||'';
+let jetonAdmin=(typeof window.mcJetonAdmin==='string')?window.mcJetonAdmin:'';
+function memoriserJeton(valeur){jetonAdmin=String(valeur||'');window.mcJetonAdmin=jetonAdmin;}
 const TOKEN=(document.querySelector('meta[name="mc-token"]')||{}).content||'';
 const entetes=extra=>Object.assign({'X-MC-Token':TOKEN},extra||{});
-const post=async(path,obj)=>{const r=await fetch('/api/mc/'+path,{method:'POST',headers:entetes({'Content-Type':'application/json',...(jetonAdmin?{'X-MC-Admin':jetonAdmin}:{})}),body:JSON.stringify({project:getProject(),...obj})});const d=await r.json();if(!r.ok)throw Error(d.error||'Erreur');return d};
+function demanderJeton(){return new Promise(resolve=>{const retour=document.activeElement;let boite=document.getElementById('mcAuth');if(!boite){boite=document.createElement('dialog');boite.id='mcAuth';boite.innerHTML='<form><h2>Action non réalisée</h2><p>Le serveur a refusé cette action. Saisis le jeton administrateur pour réessayer. Il reste seulement en mémoire pour cette page.</p><label>Jeton administrateur <input name="jeton" type="password" autocomplete="current-password"></label><div class="mc-auth-actions"><button type="submit">Réessayer</button><button type="button" id="mcAuthAnnuler">Annuler</button></div></form>';document.body.append(boite);}const form=boite.querySelector('form');const fin=v=>{if(boite.open)boite.close();if(retour&&retour.focus)retour.focus();resolve(v);};form.onsubmit=e=>{e.preventDefault();memoriserJeton(form.elements.jeton.value);form.elements.jeton.value='';fin(!!jetonAdmin);};boite.querySelector('#mcAuthAnnuler').onclick=()=>{form.elements.jeton.value='';fin(false);};boite.showModal();form.elements.jeton.focus();});}
+const post=async(path,obj,retente)=>{const r=await fetch('/api/mc/'+path,{method:'POST',headers:entetes({'Content-Type':'application/json',...(jetonAdmin?{'X-MC-Admin':jetonAdmin}:{})}),body:JSON.stringify({project:getProject(),...obj})});let d={};try{d=await r.json()}catch(_){d={}}if(r.status===403&&!retente){const ok=await demanderJeton();if(!ok)throw Error('Action non réalisée : autorisation requise.');return post(path,obj,true);}if(!r.ok)throw Error(d.error||('Action non réalisée ('+r.status+')'));return d};
 fetch('/api/mc/models',{headers:entetes()}).then(r=>r.json()).then(d=>{modelesOllama=d.models||[]}).catch(()=>{});
 function toast(s){if(typeof notify==='function')notify(s);else alert(s)}
+function libellePreuve(etat){
+ const noms={none:'Non vérifié',declared:'Déclaré',human:'Revu par une personne',test:'Test exécuté',validated:'Validé',approved:'Validé',refused:'Refusé'};
+ return Object.prototype.hasOwnProperty.call(noms,etat)?noms[etat]:('État serveur : '+etat);
+}
+function choisirTest(id){
+ modal('Lancer un test autorisé','<p class="subtle">Seules les commandes autorisées par le serveur. Aucun texte libre.</p><label>Commande</label><select id="mcTestCmd"><option value="unittest">unittest</option><option value="py_compile">py_compile</option><option value="node_check">node_check</option></select>',async()=>{
+  const command=$('mcTestCmd').value;
+  const r=await post('job/test',{id,agent_id:acteurId(),command});
+  const code=(r.evidence||{}).exit_code;
+  toast('Test exécuté : '+command+' · code '+code);
+ },'Lancer le test');
+}
 async function refresh(){const p=getProject();if(!p)return;try{const r=await fetch('/api/mc/state?project='+p,{headers:entetes()});if(!r.ok)throw Error('Serveur indisponible');data=await r.json();render();majNotifications()}catch(e){toast(e.message)}}
-function modal(title,html,fn){$('modalTitle').textContent=title;$('modalFields').innerHTML=html;$('modalback').classList.add('open');modalCallback=fn;window.mcModal=true}
-const submit=$('submit');submit.addEventListener('click',async e=>{if(!window.mcModal)return;e.stopImmediatePropagation();try{await modalCallback();window.mcModal=false;$('modalback').classList.remove('open');await refresh()}catch(err){toast(err.message)}},true);
-$('cancel').addEventListener('click',()=>window.mcModal=false);
+let focusRetour=null;
+function fermerModal(){window.mcModal=false;$('modalback').classList.remove('open');$('submit').disabled=false;$('submit').textContent='Enregistrer';const retour=focusRetour;focusRetour=null;if(retour&&retour.focus)retour.focus();}
+function modal(title,html,fn,libelle){focusRetour=document.activeElement;$('modalTitle').textContent=title;$('modalFields').innerHTML=html;$('submit').textContent=libelle||'Enregistrer';$('submit').disabled=false;$('modalback').classList.add('open');modalCallback=fn;window.mcModal=true;const premier=$('modalFields').querySelector('input,select,textarea,button');if(premier)premier.focus();}
+const submit=$('submit');submit.addEventListener('click',async e=>{if(!window.mcModal)return;e.stopImmediatePropagation();try{await modalCallback();fermerModal();await refresh()}catch(err){toast(err.message);$('submit').disabled=false;if(/refl|fléch/.test($('submit').textContent))$('submit').textContent='Réessayer';}},true);
+$('cancel').addEventListener('click',()=>{if(window.mcModal)fermerModal();});
 const roles=[['manager','Chef de projet'],['architect','Architecte'],['frontend','Développeur frontend'],['backend','Développeur backend'],['database','Spécialiste données'],['tester','Tests'],['auditor','Audit'],['security','Sécurité'],['documentation','Documentation'],['specialist','Spécialiste']];
 const roleName=r=>{const t=(data.roles||[]).find(x=>x.key===r);return t?t.label:(roles.find(x=>x[0]===r)?.[1]||r)};
 const roleListe=()=>((data.roles&&data.roles.length)?data.roles.map(r=>[r.key,r.label]):roles);
@@ -49,7 +65,7 @@ async function voirDiff(id){
   const r=await fetch('/api/mc/job?project='+getProject()+'&id='+id,{headers:entetes()});
   if(!r.ok)throw Error('Diff indisponible');
   const j=await r.json();
-  modal('Proposition · '+j.title,'<p class="subtle">Statut : '+esc(j.status)+'. Rien n\'est appliqué sans approbation.</p><pre style="max-height:50vh;overflow:auto;white-space:pre-wrap">'+esc(j.diff||'Aucun diff')+'</pre>',async()=>{});
+  modal('Proposition · '+j.title,'<p class="subtle">Statut : '+esc(j.status)+'. Approuver écrit les fichiers dans le dossier isolé. Ce n\'est pas un commit git : le commit est une action séparée, après les tests et les revues.</p><pre style="max-height:50vh;overflow:auto;white-space:pre-wrap">'+esc(j.diff||'Aucun diff')+'</pre>',async()=>{});
  }catch(e){toast(e.message)}
 }
 async function revueCode(id){
@@ -63,6 +79,7 @@ async function validerJob(id){
  try{await post('job/validate',{id,agent_id:acteurId()});await refresh();toast('Travail validé (tests verts + revues)')}catch(e){toast(e.message)}
 }
 async function committerJob(id){
+ if(!confirm('Écrire un commit git dans le workspace de ce job ? Cette écriture n\'est pas annulée depuis cette fenêtre.'))return;
  try{const r=await post('job/commit',{id,agent_id:acteurId()});await refresh();toast(r.commit?('Commit '+String(r.commit).slice(0,8)):'Rien à committer')}catch(e){toast(e.message)}
 }
 async function voirRapport(id){
@@ -79,9 +96,13 @@ function createLink(){
  if(data.agents.length<2){toast('Il faut au moins deux agents');return}
  modal('Relier deux agents','<label>Source</label><select id="mcSource">'+agentOptions(false)+'</select><label>Destination</label><select id="mcTarget">'+agentOptions(false)+'</select><label>Type de connexion</label><select id="mcKind"><option value="communication">Communication</option><option value="dependency">Dépendance</option></select>',()=>post('link',{source_id:Number($('mcSource').value),target_id:Number($('mcTarget').value),kind:$('mcKind').value}))}
 const nav=document.querySelector('.rail');
-const button=document.createElement('button');button.textContent='♜';button.title='Mission Control';button.dataset.page='mission';button.onclick=()=>open();nav.insertBefore(button,nav.querySelector('.bottom'));
+const button=document.createElement('button');button.type='button';button.textContent='MC';button.title='Mission Control';button.setAttribute('aria-label','Mission Control');button.dataset.page='mission';button.onclick=()=>open();
+const logo=nav.querySelector('.logo');nav.insertBefore(button,logo?logo.nextSibling:nav.firstChild);
+const ancien=document.createElement('button');ancien.type='button';ancien.id='ancienTableau';ancien.textContent='Ancien tableau';ancien.title="Canvas, tâches et journal d'origine";
+ancien.onclick=()=>{nav.classList.add('legacy-open');document.body.classList.add('legacy-page');window.mcPage='legacy';const cible=nav.querySelector('button[data-page="canvas"]');if(cible)cible.click();};
+const spacer=document.querySelector('.header .spacer');if(spacer)spacer.before(ancien);else document.querySelector('.header').append(ancien);
 const section=document.createElement('section');section.id='mission';section.className='view';
-section.innerHTML='<div class="mc-toolbar"><strong>Mission Control</strong><label style="font-size:12px;color:#b9a6e8" title="Agent qui exerce les actions sensibles">Agir en tant que</label><select id="mcActeur" style="min-width:130px"></select><button id="mcAdd">＋ Agent</button><button id="mcMission">＋ Mission</button><button id="mcAssign">＋ Attribution</button><button id="mcNote">＋ Contexte</button><button id="mcDecision">＋ Décision</button><button id="mcRol">＋ Rôle</button><button id="mcRecrute">Recruter</button><button id="mcCharge">Charge</button><input id="mcRecherche" placeholder="Rechercher (2 lettres min.)" style="min-width:190px;padding:6px 9px;border-radius:8px;border:1px solid #4a3f5c;background:#191524;color:#e8e2f3"><button id="mcNotif" title="Notifications">●</button><button id="mcPerm">Permissions</button><button id="mcReglages">Réglages</button><button id="mcSauvegardes">Sauvegardes</button><button id="mcJob">＋ Job</button><button id="mcBranche">＋ Branche</button><button id="mcPlan">＋ Plan</button><button id="mcOrchestrer">Orchestrer</button><button id="mcAligner">Aligner</button><button id="mcLink">↗ Connexion</button><div style="flex:1"></div><button id="mcSwitch">Missions & preuves</button><button id="mcRefresh">↻</button></div><div class="mc-stage" id="mcStage"><div class="mc-world" id="mcWorld"><div class="mc-zones" id="mcZones"></div><svg class="mc-links" id="mcLinks"></svg><div id="mcNodes"></div></div><div class="mc-minimap"><canvas id="mcMinimapCanvas" width="200" height="120"></canvas></div><div class="mc-legend">Déplacer : glisser · Maj+clic : sélection · Déposer sur une zone : changer d\'équipe · Violet : hiérarchie · Vert : communication · Orange : dépendance</div><aside class="mc-side" id="mcDetails" style="display:none"></aside></div><div id="mcRecords" class="dash" style="display:none;height:calc(100% - 63px);overflow:auto"></div>';
+section.innerHTML='<div class="mc-toolbar"><strong>Mission Control</strong><label title="Indique quel agent est cité dans l\'action. Ce n\'est pas une connexion.">Attribuer l\'action à</label><select id="mcActeur" aria-label="Attribuer l\'action à"></select><div class="mc-modes" role="tablist"><button type="button" class="active" data-groupe="equipe" aria-pressed="true">Équipe</button><button type="button" data-groupe="travail" aria-pressed="false">Travail</button><button type="button" data-groupe="decisions" aria-pressed="false">Décisions</button><button type="button" data-groupe="compte" aria-pressed="false">Compte</button></div><div class="mc-groupe" data-groupe="equipe"><button id="mcAdd" type="button">＋ Agent</button><button id="mcRol" type="button">＋ Rôle</button><button id="mcRecrute" type="button">Recruter</button><button id="mcLink" type="button">↗ Connexion</button><button id="mcAligner" type="button">Aligner</button></div><div class="mc-groupe" data-groupe="travail" hidden><button id="mcMission" type="button">＋ Mission</button><button id="mcAssign" type="button">＋ Attribution</button><button id="mcJob" type="button">＋ Job</button><button id="mcBranche" type="button">＋ Branche</button><button id="mcPlan" type="button" title="Demander un découpage en tâches. Rien n\'est créé avant accord.">Proposer un plan</button><button id="mcOrchestrer" type="button">Orchestrer</button><button id="mcNote" type="button">＋ Contexte</button></div><div class="mc-groupe" data-groupe="decisions" hidden><button id="mcDecision" type="button">＋ Décision</button><button id="mcDecisionsVue" type="button">Propositions</button><button id="mcCharge" type="button">Charge</button><button id="mcPerm" type="button">Permissions</button></div><div class="mc-groupe" data-groupe="compte" hidden><button id="mcReglages" type="button">Réglages</button><button id="mcSauvegardes" type="button">Sauvegardes</button><button id="mcConnecteurs" type="button">Connecteurs</button><input id="mcRecherche" aria-label="Rechercher" placeholder="Rechercher (2 lettres min.)"><button id="mcNotif" type="button" title="Notifications" aria-label="Notifications">●</button></div><div style="flex:1"></div><button id="mcSwitch" type="button">Missions & preuves</button><button id="mcRefresh" type="button" aria-label="Actualiser">↻</button></div><div class="mc-stage" id="mcStage"><div class="mc-world" id="mcWorld"><div class="mc-zones" id="mcZones"></div><svg class="mc-links" id="mcLinks"></svg><div id="mcNodes"></div></div><div class="mc-minimap"><canvas id="mcMinimapCanvas" width="200" height="120"></canvas></div><div class="mc-legend">Déplacer : glisser · Maj+clic : sélection · Déposer sur une zone : changer d\'équipe · Violet : hiérarchie · Vert : communication · Orange : dépendance</div><aside class="mc-side" id="mcDetails" style="display:none"></aside></div><div id="mcRecords" class="dash" style="display:none;overflow:auto"></div>';
 document.querySelector('.main').appendChild(section);
 function createDecision(){
  modal('Décision technique','<label>Titre</label><input id="mcDecTitle" placeholder="Choix du stockage"><label>Décision</label><textarea id="mcDecBody" placeholder="Ce qui a été décidé"></textarea><label>Justification (obligatoire)</label><textarea id="mcDecWhy" placeholder="Pourquoi, avec les faits mesurés"></textarea><label>Alternatives écartées</label><textarea id="mcDecAlt" placeholder="Ce qui a été envisagé et pourquoi ce n\'est pas retenu"></textarea><label>Agent (optionnel)</label><select id="mcDecAgent">'+agentOptions()+'</select>',()=>post('decision',{agent_id:$('mcDecAgent').value||null,title:$('mcDecTitle').value,decision:$('mcDecBody').value,rationale:$('mcDecWhy').value,alternatives:$('mcDecAlt').value}));
@@ -109,7 +130,7 @@ async function rechercherGlobal(terme){
 }
 async function ouvrirPermissions(){
  try{
-  const equipes=(data.permissions&&data.permissions.length)?data.permissions:[...new Set(data.agents.map(a=>a.team))].map(equipe=>({team:equipe,can_create_agents:true,can_approve_jobs:true,can_run_tests:true}));
+  const equipes=(data.permissions&&data.permissions.length)?data.permissions:[...new Set(data.agents.map(a=>a.team))].map(equipe=>({team:equipe,can_create_agents:false,can_approve_jobs:false,can_run_tests:false}));
   const html=equipes.map(e=>'<div class="mc-record"><b>'+esc(e.team)+'</b><br><label style="display:inline-block;margin-right:10px"><input type="checkbox" data-perm-team="'+esc(e.team)+'" data-perm="can_create_agents" '+(e.can_create_agents?'checked':'')+'> Recruter</label><label style="display:inline-block;margin-right:10px"><input type="checkbox" data-perm-team="'+esc(e.team)+'" data-perm="can_approve_jobs" '+(e.can_approve_jobs?'checked':'')+'> Approuver un job</label><label style="display:inline-block"><input type="checkbox" data-perm-team="'+esc(e.team)+'" data-perm="can_run_tests" '+(e.can_run_tests?'checked':'')+'> Lancer les tests</label></div>').join('')||'<p class="subtle">Aucune équipe.</p>';
   modal('Permissions par équipe', html, async()=>{
    for(const e of equipes){
@@ -125,18 +146,17 @@ async function ouvrirReglages(){
   const r=await fetch('/api/mc/settings?project='+getProject(),{headers:entetes()});
   if(!r.ok)throw Error('Réglages indisponibles');
   const s=await r.json();
-  modal('Réglages','<p class="subtle">Jeton administrateur : voir logs\\admin-token.txt</p><label>Jeton administrateur</label><input id="mcSetAdmin" value="'+esc(jetonAdmin)+'"><p class="subtle">Les réglages sont enregistrés par projet. Le port et le dossier des workspaces demandent un redémarrage.</p>'
+  modal('Réglages','<p class="subtle">Le jeton administrateur reste dans logs\\admin-token.txt sur cette machine. Le serveur ne le renvoie pas. Saisi ici, il reste seulement en mémoire pour cette page.</p><label>Jeton administrateur</label><input id="mcSetAdmin" type="password" autocomplete="current-password" placeholder="'+(jetonAdmin?'déjà en mémoire pour cette page':'coller le jeton local')+'"><p class="subtle">Les réglages sont enregistrés par projet. Le port et le dossier des workspaces demandent un redémarrage.</p>'
    +'<label>Adresse Ollama</label><input id="mcSetUrl" value="'+esc(s.ollama_url)+'">'
    +'<label>Modèle par défaut</label><input id="mcSetModel" value="'+esc(s.ollama_model)+'">'
    +'<label>Jobs simultanés (vide = selon la mémoire)</label><input id="mcSetJobs" value="'+esc(s.max_jobs)+'">'
    +'<label>Sauvegarde automatique (minutes, 0 = arrêtée)</label><input id="mcSetBackup" value="'+esc(s.auto_backup_minutes)+'">'
    +'<label>Dossier des workspaces</label><input value="'+esc(s.workspace_dir)+'" disabled>',async()=>{
-    jetonAdmin=$('mcSetAdmin').value.trim();sessionStorage.setItem('mc-admin',jetonAdmin);
-    const postAdmin=(chemin,corps)=>fetch('/api/mc/'+chemin,{method:'POST',headers:entetes({'Content-Type':'application/json','X-MC-Admin':jetonAdmin}),body:JSON.stringify({project:getProject(),...corps})}).then(r=>{if(!r.ok)throw Error('Jeton administrateur requis');return r.json()});
-    await postAdmin('settings',{key:'ollama_url',value:$('mcSetUrl').value});
-    await postAdmin('settings',{key:'ollama_model',value:$('mcSetModel').value});
-    await postAdmin('settings',{key:'max_jobs',value:$('mcSetJobs').value});
-    await postAdmin('settings',{key:'auto_backup_minutes',value:$('mcSetBackup').value});
+    const saisi=$('mcSetAdmin').value.trim();if(saisi)memoriserJeton(saisi);
+    await post('settings',{key:'ollama_url',value:$('mcSetUrl').value});
+    await post('settings',{key:'ollama_model',value:$('mcSetModel').value});
+    await post('settings',{key:'max_jobs',value:$('mcSetJobs').value});
+    await post('settings',{key:'auto_backup_minutes',value:$('mcSetBackup').value});
     toast('Réglages enregistrés');
    });
  }catch(e){toast(e.message)}
@@ -148,7 +168,7 @@ async function ouvrirSauvegardes(){
   const s=await r.json();
   const lignes=(s.backups||[]).map(b=>'<div class="mc-record">'+esc(b.nom)+' · '+Math.round(b.octets/1024)+' Ko · '+esc(b.quand)+' <button data-restore="'+esc(b.nom)+'">Restaurer</button></div>').join('');
   modal('Sauvegardes',(lignes||'<p class="subtle">Aucune sauvegarde.</p>')+'<p><button id="mcBackupNow">Sauvegarder maintenant</button></p>',async()=>{});
-  setTimeout(()=>{const b=$('mcBackupNow');if(b)b.onclick=async()=>{try{await post('backup',{});await refresh();toast('Sauvegarde écrite')}catch(e){toast(e.message)}};},50);
+  setTimeout(()=>{const b=$('mcBackupNow');if(b)b.onclick=async()=>{try{const r=await post('backup',{});if(!r||!r.file)throw Error('Le serveur n\'a pas confirmé la sauvegarde.');await refresh();toast('Sauvegarde écrite : '+r.file)}catch(e){toast('Sauvegarde non confirmée : '+e.message)}};},50);
   setTimeout(()=>{document.querySelectorAll('[data-restore]').forEach(b=>b.onclick=async()=>{if(!confirm('Restaurer '+b.dataset.restore+' ? La base actuelle sera sauvegardée avant.'))return;try{await post('restore',{file:b.dataset.restore});await refresh();toast('Base restaurée')}catch(e){toast(e.message)}});},50);
  }catch(e){toast(e.message)}
 }
@@ -183,10 +203,13 @@ async function voirCharge(){
 }
 $('mcAdd').onclick=createAgent;$('mcMission').onclick=createMission;$('mcAssign').onclick=createAssignment;$('mcNote').onclick=createNote;$('mcDecision').onclick=createDecision;$('mcRol').onclick=createRole;$('mcRecrute').onclick=createRecruit;$('mcCharge').onclick=voirCharge;$('mcPerm').onclick=ouvrirPermissions;$('mcReglages').onclick=ouvrirReglages;$('mcSauvegardes').onclick=ouvrirSauvegardes;$('mcNotif').onclick=voirNotifications;$('mcRecherche').addEventListener('keydown',e=>{if(e.key==='Enter')rechercherGlobal($('mcRecherche').value)});$('mcLink').onclick=createLink;$('mcJob').onclick=createJob;$('mcBranche').onclick=createBranche;$('mcPlan').onclick=createPlan;$('mcOrchestrer').onclick=orchestrer;$('mcAligner').onclick=aligner;$('mcRefresh').onclick=refresh;
 $('mcSwitch').onclick=()=>{mode=mode==='agents'?'missions':'agents';$('mcSwitch').textContent=mode==='agents'?'Missions & preuves':'Canvas des agents';render()};
-function open(){page='mission';document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id==='mission'));document.querySelectorAll('.rail button[data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page==='mission'));$('pageTitle').textContent='Mission Control · Organisation dynamique';$('linkTask').style.display='none';refresh()}
+document.querySelectorAll('.mc-modes button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.mc-modes button').forEach(x=>{const on=x===b;x.classList.toggle('active',on);x.setAttribute('aria-pressed',on?'true':'false');});document.querySelectorAll('.mc-groupe').forEach(g=>{g.hidden=g.dataset.groupe!==b.dataset.groupe;});});
+$('mcConnecteurs').onclick=()=>{const b=[...document.querySelectorAll('button')].find(x=>x.textContent==='Connecteurs IA / MCP');if(b)b.click();};
+$('mcDecisionsVue').onclick=()=>{mode='missions';$('mcSwitch').textContent='Canvas des agents';render();};
+function open(){window.mcPage='mission';document.body.classList.remove('legacy-page');const rail=document.querySelector('.rail');if(rail)rail.classList.remove('legacy-open');document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id==='mission'));document.querySelectorAll('.rail button[data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page==='mission'));$('pageTitle').textContent='Mission Control';if($('linkTask'))$('linkTask').style.display='none';refresh()}
 const originalShow=window.showPage;
 document.querySelectorAll('.rail button[data-page]:not([data-page="mission"])').forEach(b=>b.addEventListener('click',()=>{window.mcModal=false},true));
-$('project').addEventListener('change',()=>{chosen=null;if(page==='mission')refresh()});
+$('project').addEventListener('change',()=>{chosen=null;if(typeof window.rechargerConversations==='function')window.rechargerConversations();if(window.mcPage==='mission')refresh()});
 function pos(a){return{x:a.x,y:a.y}}
 function edgeMarkup(){const m=new Map(data.agents.map(a=>[a.id,a]));let lines=[];
 for(const a of data.agents){if(a.manager_id&&m.has(a.manager_id))lines.push([m.get(a.manager_id),a,'#a98df0',false])}
@@ -226,7 +249,7 @@ function equipeSous(clientX,clientY){
  return zone?zone.dataset.team:null;
 }
 function renderCanvas(){
- $('mcNodes').innerHTML=data.agents.map(a=>'<div class="mc-node'+(selection.has(a.id)?' selectionne':'')+'" data-id="'+a.id+'" data-status="'+esc(a.status)+'" style="left:'+a.x+'px;top:'+a.y+'px"><div class="mc-head"><b>◈ &nbsp;'+esc(a.name)+'</b><div class="mc-role">'+esc(roleName(a.role))+' · '+esc(a.team)+'</div><div class="mc-role">Responsable : '+esc(data.agents.find(m=>m.id===a.manager_id)?.name||'Aucun')+'</div></div><div class="mc-foot"><span class="mc-dot"></span>'+esc(a.status)+' · '+esc(a.model)+'</div></div>').join('')||'<div class="mc-empty">Ton équipe est vide. Clique sur « ＋ Agent » pour créer ton premier assistant.</div>';
+ $('mcNodes').innerHTML=data.agents.map(a=>'<div class="mc-node'+(selection.has(a.id)?' selectionne':'')+'" data-id="'+a.id+'" data-status="'+esc(a.status)+'" style="left:'+a.x+'px;top:'+a.y+'px"><div class="mc-head"><b>◈ &nbsp;'+esc(a.name)+'</b><div class="mc-role">'+esc(roleName(a.role))+' · '+esc(a.team)+'</div><div class="mc-role">Responsable : '+esc(data.agents.find(m=>m.id===a.manager_id)?.name||'Aucun')+'</div></div><div class="mc-foot"><span class="mc-dot"></span>'+esc(a.status)+' · '+esc(a.model)+'</div></div>').join('')||'<div class="mc-empty">Ton équipe est vide. Clique sur « ＋ Agent » pour créer ton premier assistant. Ensuite, dans Travail, crée la première mission.</div>';
  $('mcZones').innerHTML=zonesMarkup();
  edgeMarkup();transform();dessinerMinimap();marquerSelection();
  $('mcNodes').querySelectorAll('.mc-node').forEach(el=>el.addEventListener('pointerdown',e=>{
@@ -248,7 +271,7 @@ $('mcStage').addEventListener('pointerdown',e=>{
  drag={type:'pan',sx:e.clientX,sy:e.clientY,x:pan.x,y:pan.y};$('mcStage').setPointerCapture(e.pointerId);
 });
 document.addEventListener('pointermove',e=>{
- if(!drag||page!=='mission')return;
+ if(!drag||window.mcPage!=='mission')return;
  const dx=e.clientX-drag.sx,dy=e.clientY-drag.sy;
  if(drag.type==='pan'){pan.x=drag.x+dx;pan.y=drag.y+dy;transform();dessinerMinimap();return}
  drag.moved=drag.moved||Math.abs(dx)+Math.abs(dy)>4;
@@ -261,7 +284,7 @@ document.addEventListener('pointermove',e=>{
  edgeMarkup();dessinerMinimap();
 });
 document.addEventListener('pointerup',async e=>{
- if(!drag||page!=='mission')return;
+ if(!drag||window.mcPage!=='mission')return;
  const d=drag;drag=null;
  if(d.type!=='node')return;
  if(!d.moved){detail(d.id);return}
@@ -295,12 +318,16 @@ function createBranche(){
 function createPlan(){
  const missions=data.missions.map(m=>[m.id,m.title]);
  const modeles=[...new Set(modelesOllama)].map(m=>[m,m]);
- modal('Nouveau plan','<p class="subtle">Le modele decoupe l\'objectif en taches. Rien n\'est cree avant ton accord.</p><label>Objectif</label><textarea id="mcPlanObjective" placeholder="Ce que l\'equipe doit livrer"></textarea><label>Mission (optionnel)</label><select id="mcPlanMission"><option value="">Aucune</option>'+opts(missions)+'</select><label>Modele</label><select id="mcPlanModel">'+opts(modeles)+'</select>',async()=>{
+ const alerte=modeles.length?'':'<p role="alert">Aucun modèle disponible. Ollama ne répond pas : rien n\'a été lancé.</p><p><button type="button" id="mcPlanRetry">Réessayer le modèle</button></p>';
+ modal('Nouveau plan',alerte+'<p class="subtle">Le modele decoupe l\'objectif en taches. Rien n\'est cree avant ton accord.</p><label>Objectif</label><textarea id="mcPlanObjective" placeholder="Ce que l\'equipe doit livrer"></textarea><label>Mission (optionnel)</label><select id="mcPlanMission"><option value="">Aucune</option>'+opts(missions)+'</select><label>Modele</label><select id="mcPlanModel">'+(modeles.length?opts(modeles):'<option value="">Modèle indisponible</option>')+'</select>',async()=>{
+  if(!modelesOllama.length)throw Error('Aucun modèle disponible. Rien n\'a été lancé. Réessaie.');
   const bouton=$('submit');
   if(bouton){bouton.disabled=true;bouton.textContent='Le modele reflechit…'}
   const r=await post('plan',{objective:$('mcPlanObjective').value,mission_id:$('mcPlanMission').value||null,model:$('mcPlanModel').value});
   setTimeout(()=>afficherPlan(r),150);
  });
+ const retry=$('mcPlanRetry');
+ if(retry)retry.onclick=async()=>{retry.disabled=true;try{const r=await fetch('/api/mc/models',{headers:entetes()});const d=await r.json();modelesOllama=d.models||[];}catch(_){modelesOllama=[];}retry.disabled=false;if(modelesOllama.length){fermerModal();createPlan();}else toast('Toujours aucun modèle. Rien n\'a été lancé.');};
 }
 function afficherPlan(r){
  const taches=r.plan.tasks.map((t,i)=>'<div class="mc-record"><b>'+(i+1)+'. '+esc(t.title)+'</b> · '+esc(t.role)+' · '+(t.depends_on.length?'apres '+t.depends_on.map(x=>x+1).join(', '):'sans prerequis')+'<p>'+esc(t.task)+'</p><small>'+esc((r.assignations[String(t.index)]||{}).agent||'aucun agent')+'</small></div>').join('');
@@ -308,6 +335,7 @@ function afficherPlan(r){
  modal('Plan propose',taches+alerte,async()=>{await post('plan/apply',{id:r.id});toast('Plan applique : jobs crees')});
 }
 async function orchestrer(){
+ if(!confirm("Orchestrer lance maintenant les jobs prêts, dans la limite de charge. Aucune proposition n\'est approuvée automatiquement."))return;
  try{const r=await post('orchestrator/run',{});
   toast(r.lances.length?('Lances : '+r.lances.join(', ')):'Rien a lancer ('+r.limite+' place(s), '+r.en_cours+' en cours)');
   await refresh();
@@ -320,11 +348,11 @@ function detail(id){
  const panel=$('mcDetails');panel.style.display='block';
  const nonLus=(data.messages||[]).filter(m=>!m.read_at&&(m.to_agent===id||(m.to_team&&m.to_team===a.team)));
  const aAcquitter=data.handoffs.filter(h=>h.new_manager_id===id&&!h.ack_at);
- panel.innerHTML='<button id="mcClose" style="float:right">✕</button><h3>'+esc(a.name)+'</h3><small>'+esc(roleName(a.role))+' · '+esc(a.status)+'</small><label>Nom</label><input id="mcEditName" value="'+esc(a.name)+'"><label>Équipe / branche</label><input id="mcEditTeam" value="'+esc(a.team)+'"><label>Responsable (transfert avec passation)</label><select id="mcEditManager">'+opts([['','Aucun responsable'],...data.agents.filter(x=>x.id!==id).map(x=>[x.id,x.name])],a.manager_id||'')+'</select><label>Statut</label><select id="mcEditStatus">'+opts([['idle','En attente'],['working','En cours'],['blocked','Bloqué'],['done','Terminé (déclaré)'],['paused','En pause']],a.status)+'</select><label>Compétences</label><input id="mcEditSkills" value="'+esc(a.skills||'')+'"><label>Modèle Ollama</label><select id="mcEditModel">'+opts([...new Set([a.model,...modelesOllama])].filter(Boolean).map(m=>[m,m]),a.model)+'</select><label>Instructions</label><textarea id="mcEditInstructions">'+esc(a.instructions)+'</textarea><button id="mcSave" class="primary">Enregistrer / Transférer</button><button id="mcClone">Dupliquer</button><button id="mcArchive">Archiver</button><button id="mcContext">Voir le dossier de passation</button><h4>Messages non lus ('+nonLus.length+')</h4>'+nonLus.map(m=>'<div class="mc-record">'+esc(m.body)+'<br><button data-msg="'+m.id+'">Marquer lu</button></div>').join('')+'<h4>Passations à acquitter ('+aAcquitter.length+')</h4>'+aAcquitter.map(h=>'<div class="mc-record">'+esc(h.summary)+'<br><button data-handoff="'+h.id+'">Acquitter</button></div>').join('')+'<h4>Tâches attribuées ('+assignments.length+')</h4>'+assignments.slice(0,6).map(x=>'<div class="mc-record">'+esc(x.task)+'<br><small>'+esc(x.status)+'</small></div>').join('')+'<h4>Passations ('+handoffs.length+')</h4>'+handoffs.slice(0,5).map(x=>'<div class="mc-record">'+esc(x.summary)+'</div>').join('');
+ panel.innerHTML='<button id="mcClose" style="float:right">✕</button><h3>'+esc(a.name)+'</h3><small>'+esc(roleName(a.role))+' · '+esc(a.status)+'</small><label>Nom</label><input id="mcEditName" value="'+esc(a.name)+'"><label>Équipe / branche</label><input id="mcEditTeam" value="'+esc(a.team)+'"><label>Responsable (transfert avec passation)</label><select id="mcEditManager">'+opts([['','Aucun responsable'],...data.agents.filter(x=>x.id!==id).map(x=>[x.id,x.name])],a.manager_id||'')+'</select><label>Statut</label><select id="mcEditStatus">'+opts([['idle','En attente'],['working','En cours'],['blocked','Bloqué'],['done','Terminé (déclaré)'],['paused','En pause']],a.status)+'</select><label>Compétences</label><input id="mcEditSkills" value="'+esc(a.skills||'')+'"><label>Modèle Ollama</label><select id="mcEditModel">'+opts([...new Set([a.model,...modelesOllama])].filter(Boolean).map(m=>[m,m]),a.model)+'</select><label>Instructions</label><textarea id="mcEditInstructions">'+esc(a.instructions)+'</textarea><button id="mcSave" class="primary" title="Enregistre le nom, l\'équipe et le responsable. Un nouveau responsable crée une passation.">Enregistrer l\'agent</button><button id="mcClone">Dupliquer</button><button id="mcArchive">Archiver</button><button id="mcContext">Voir le dossier de passation</button><h4>Messages non lus ('+nonLus.length+')</h4>'+nonLus.map(m=>'<div class="mc-record">'+esc(m.body)+'<br><button data-msg="'+m.id+'">Marquer lu</button></div>').join('')+'<h4>Passations à acquitter ('+aAcquitter.length+')</h4>'+aAcquitter.map(h=>'<div class="mc-record">'+esc(h.summary)+'<br><button data-handoff="'+h.id+'">Acquitter</button></div>').join('')+'<h4>Tâches attribuées ('+assignments.length+')</h4>'+assignments.slice(0,6).map(x=>'<div class="mc-record">'+esc(x.task)+'<br><small>'+esc(x.status)+'</small></div>').join('')+'<h4>Passations ('+handoffs.length+')</h4>'+handoffs.slice(0,5).map(x=>'<div class="mc-record">'+esc(x.summary)+'</div>').join('');
  $('mcContext').onclick=async()=>{try{const r=await fetch('/api/mc/context?project='+getProject()+'&agent='+id,{headers:entetes()});if(!r.ok)throw Error('Contexte indisponible');const pack=await r.json();modal('Dossier de passation · '+a.name,'<p class="subtle">Données préparées, non envoyées automatiquement à une IA.</p><textarea id="mcPacket" style="min-height:330px"></textarea>',async()=>{await navigator.clipboard.writeText($('mcPacket').value);toast('Contexte copié')});$('mcPacket').value=JSON.stringify(pack,null,2)}catch(e){toast(e.message)}};
  $('mcClose').onclick=()=>panel.style.display='none';
  $('mcClone').onclick=async()=>{try{await post('agent/clone',{id});await refresh();toast('Agent dupliqué')}catch(e){toast(e.message)}};
- $('mcArchive').onclick=async()=>{try{await post('agent/archive',{id});await refresh();panel.style.display='none';toast('Agent archivé')}catch(e){toast(e.message)}};
+ $('mcArchive').onclick=async()=>{if(!confirm('Archiver '+a.name+" ? Il quitte le canvas. Les missions et l\'historique restent."))return;try{await post('agent/archive',{id});await refresh();panel.style.display='none';toast('Agent archivé')}catch(e){toast(e.message)}};
  panel.querySelectorAll('[data-msg]').forEach(b=>b.onclick=async()=>{try{await post('message/read',{id:Number(b.dataset.msg),agent_id:id});await refresh();toast('Message lu')}catch(e){toast(e.message)}});
  panel.querySelectorAll('[data-handoff]').forEach(b=>b.onclick=async()=>{try{await post('handoff/ack',{id:Number(b.dataset.handoff),agent_id:id});await refresh();toast('Passation acquittée')}catch(e){toast(e.message)}});
  $('mcSave').onclick=async()=>{try{await post('agent/update',{id,name:$('mcEditName').value,team:$('mcEditTeam').value,manager_id:$('mcEditManager').value||null,status:$('mcEditStatus').value,model:$('mcEditModel').value,skills:$('mcEditSkills').value,instructions:$('mcEditInstructions').value});await refresh();toast('Agent actualisé et passation enregistrée')}catch(e){toast(e.message)}};
@@ -340,12 +368,12 @@ function renderRecords(){
   if(j.status==='proposed')actions.push(['approve','Approuver'],['pause','Pause'],['reject','Refuser'],['diff','Voir le diff']);
   if(j.status==='approved')actions.push(['test','Lancer les tests'],['diff','Voir le diff']);
   if(j.status==='approved'||j.status==='completed')actions.push(['review_secu','Audit sécu'],['review_code','Revue code'],['validate','Valider'],['commit','Commit'],['report','Rapport']);
-  return '<div class="mc-record"><b>'+esc(j.title)+'</b> · '+esc(nom)+'<p>'+esc(j.task)+'</p><small>'+esc(j.status)+(j.error?' — '+esc(j.error):'')+' · modèle '+esc(j.model)+'</small><p>'+actions.map(x=>'<button data-job="'+j.id+'" data-action="'+x[0]+'">'+esc(x[1])+'</button>').join(' ')+'</p><details><summary>Journal</summary><pre style="white-space:pre-wrap">'+esc(j.log||'—')+'</pre></details></div>';
+  return '<div class="mc-record"><b>'+esc(j.title)+'</b> · '+esc(nom)+'<p>'+esc(j.task)+'</p><small>'+esc(j.status)+(j.error?' — '+esc(j.error):'')+' · modèle '+esc(j.model)+' · '+esc(libellePreuve((data.assignments.find(x=>x.id===j.assignment_id)||{}).verification||'none'))+'</small><p class="subtle">Approuver écrit la proposition dans le dossier isolé. Valider exige un test réussi et des revues. Commit écrit un commit git, à part.</p><p>'+actions.map(x=>'<button data-job="'+j.id+'" data-action="'+x[0]+'">'+esc(x[1])+'</button>').join(' ')+'</p><details><summary>Journal</summary><pre style="white-space:pre-wrap">'+esc(j.log||'—')+'</pre></details></div>';
  }).join('');
  const plans=(data.plans||[]).map(p=>'<div class="mc-record"><b>'+esc(p.objective)+'</b><small>'+esc(p.status)+' · '+esc(p.created_at)+'</small>'+(p.status==='proposed'?'<p><button data-plan="'+p.id+'">Appliquer</button></p>':'')+'</div>').join('');
  const decisions=(data.decisions||[]).map(d=>'<div class="mc-record"><b>'+esc(d.title)+'</b><p>'+esc(d.decision)+'</p><small>Justification : '+esc(d.rationale)+(d.alternatives?' · Alternatives : '+esc(d.alternatives):'')+' · '+esc(d.created_at)+'</small></div>').join('');
  const recrues=(data.recruits||[]).filter(r=>r.status==='pending').map(r=>'<div class="mc-record"><b>'+esc(r.name)+'</b> · '+esc(roleName(r.role))+' · '+esc(r.team)+'<p>'+esc(r.justification)+'</p><p><button data-recruit="'+r.id+'" data-decision="1">Accepter</button> <button data-recruit="'+r.id+'" data-decision="0">Refuser</button></p></div>').join('');
- box.innerHTML='<h2>Missions, responsabilités et preuves</h2><div class="mc-summary"><span>'+data.agents.length+' agents</span><span>'+data.missions.length+' missions</span><span>'+data.assignments.length+' attributions</span><span>'+data.handoffs.length+' passations</span><span>'+(data.jobs||[]).length+' jobs</span><span>'+(data.plans||[]).length+' plans</span></div><h3>Missions</h3>'+data.missions.map(m=>'<div class="mc-record"><b>'+esc(m.title)+'</b><p>'+esc(m.objective)+'</p><small>'+esc(m.status)+'</small></div>').join('')+'<h3>Attributions et vérifications</h3>'+data.assignments.map(a=>'<div class="mc-record"><b>'+esc(data.agents.find(x=>x.id===a.agent_id)?.name||'Agent inconnu')+'</b> · '+esc(a.task)+'<p>'+esc(a.result||'Aucun résultat transmis')+'</p><small>'+esc(a.status)+' · '+esc({none:'non vérifié',declared:'déclaré, non vérifié',human:'revu par un humain',test:'test exécuté'}[a.verification||'none']||'non vérifié')+'</small>'+(a.verification==='test'?'<small>'+esc(a.evidence||'')+'</small>':'')+'<p><button data-assignment="'+a.id+'">Mettre à jour / vérifier</button></p></div>').join('')+'<h3>Branches</h3>'+((data.branches||[]).map(b=>'<div class="mc-record"><b>'+esc(b.name)+'</b> · architecte : '+esc((data.agents.find(a=>a.id===b.architect_id)||{}).name||'aucun')+'<p>'+esc(b.description||'')+'</p></div>').join('')||'<p class="subtle">Aucune branche.</p>')+'<h3>Plans</h3>'+(plans||'<p class="subtle">Aucun plan. « ＋ Plan » sur le canvas pour en proposer un.</p>')+'<h3>Décisions</h3>'+(decisions||'<p class="subtle">Aucune décision enregistrée.</p>')+'<h3>Recrutements en attente</h3>'+(recrues||'<p class="subtle">Aucune demande en attente.</p>')+'<h3>Jobs d\'exécution</h3>'+(jobs||'<p class="subtle">Aucun job. « ＋ Job » sur le canvas pour en créer un.</p>')+'<h3>Mémoire de projet</h3>'+data.notes.map(n=>'<div class="mc-record">'+esc(n.content)+'<br><small>'+esc(n.scope)+' · '+esc(n.created_at)+'</small></div>').join('')+'<h3>Passations</h3>'+data.handoffs.map(h=>'<div class="mc-record">'+esc(h.summary)+'</div>').join('')+'<h3>Journal de coordination</h3>'+data.audit.slice(0,25).map(a=>'<div class="mc-record"><small>'+esc(a.created_at)+' · '+esc(a.action)+'</small></div>').join('');
+ box.innerHTML='<h2>Missions, responsabilités et preuves</h2><p class="subtle">Affecte une mission, lance le travail, puis distingue approbation, test et commit. Un état validé vient du serveur.</p><div class="mc-summary"><span>'+data.agents.length+' agents</span><span>'+data.missions.length+' missions</span><span>'+data.assignments.length+' attributions</span><span>'+data.handoffs.length+' passations</span><span>'+(data.jobs||[]).length+' jobs</span><span>'+(data.plans||[]).length+' plans</span></div><h3>Missions</h3>'+(data.missions.length?data.missions.map(m=>'<div class="mc-record"><b>'+esc(m.title)+'</b><p>'+esc(m.objective)+'</p><small>'+esc(m.status)+'</small></div>').join(''):'<p class="mc-empty">Aucune mission. Crée un assistant dans Équipe, puis une mission et une attribution. Le lancement, l\'approbation, le test et le commit sont des actions séparées.</p>')+'<h3>Attributions et vérifications</h3>'+data.assignments.map(a=>'<div class="mc-record"><b>'+esc(data.agents.find(x=>x.id===a.agent_id)?.name||'Agent inconnu')+'</b> · '+esc(a.task)+'<p>'+esc(a.result||'Aucun résultat transmis')+'</p><small>'+esc(a.status)+' · '+esc(libellePreuve(a.verification||'none'))+'</small>'+(a.verification==='test'?'<small>'+esc(a.evidence||'')+'</small>':'')+'<p><button data-assignment="'+a.id+'">Mettre à jour / vérifier</button></p></div>').join('')+'<h3>Branches</h3>'+((data.branches||[]).map(b=>'<div class="mc-record"><b>'+esc(b.name)+'</b> · architecte : '+esc((data.agents.find(a=>a.id===b.architect_id)||{}).name||'aucun')+'<p>'+esc(b.description||'')+'</p></div>').join('')||'<p class="subtle">Aucune branche.</p>')+'<h3>Plans</h3>'+(plans||'<p class="subtle">Aucun plan. « Proposer un plan » dans Travail pour en proposer un.</p>')+'<h3>Décisions</h3>'+(decisions||'<p class="subtle">Aucune décision enregistrée.</p>')+'<h3>Recrutements en attente</h3>'+(recrues||'<p class="subtle">Aucune demande en attente.</p>')+'<h3>Jobs d\'exécution</h3>'+(jobs||'<p class="subtle">Aucun job. « ＋ Job » sur le canvas pour en créer un.</p>')+'<h3>Mémoire de projet</h3>'+data.notes.map(n=>'<div class="mc-record">'+esc(n.content)+'<br><small>'+esc(n.scope)+' · '+esc(n.created_at)+'</small></div>').join('')+'<h3>Passations</h3>'+data.handoffs.map(h=>'<div class="mc-record">'+esc(h.summary)+'</div>').join('')+'<h3>Journal de coordination</h3>'+data.audit.slice(0,25).map(a=>'<div class="mc-record"><small>'+esc(a.created_at)+' · '+esc(a.action)+'</small></div>').join('');
  box.querySelectorAll('[data-plan]').forEach(b=>b.onclick=async()=>{try{await post('plan/apply',{id:Number(b.dataset.plan)});await refresh();toast('Plan appliqué : jobs créés')}catch(e){toast(e.message)}});
  box.querySelectorAll('[data-recruit]').forEach(b=>b.onclick=async()=>{try{await post('recruit/decide',{id:Number(b.dataset.recruit),approve:b.dataset.decision==='1'});await refresh();toast(b.dataset.decision==='1'?'Recrutement accepté':'Recrutement refusé')}catch(e){toast(e.message)}});
  box.querySelectorAll('[data-job]').forEach(b=>b.onclick=()=>{const id=Number(b.dataset.job),action=b.dataset.action;
@@ -355,15 +383,44 @@ function renderRecords(){
   if(action==='validate')return validerJob(id);
   if(action==='commit')return committerJob(id);
   if(action==='report')return voirRapport(id);
+  if(action==='test')return choisirTest(id);
   return agirSurJob(id,action)});
  box.querySelectorAll('[data-assignment]').forEach(b=>b.onclick=()=>{const a=data.assignments.find(a=>a.id===Number(b.dataset.assignment));
-  const niveaux=[['none','Rien de vérifié'],['declared','Déclaré (affirmation)'],['human','Revu par un humain'],['test','Test réellement exécuté']];
-  const preuve=(()=>{try{return JSON.stringify(JSON.parse(a.evidence||'{}'),null,2)}catch(_){return ''}})();
-  modal('Mise à jour du travail','<label>Statut</label><select id="mcAsStatus">'+opts([['queued','À faire'],['working','En cours'],['blocked','Bloqué'],['done','Terminé'],['reviewed','Revu']],a.status)+'</select><label>Résultat</label><textarea id="mcAsResult">'+esc(a.result)+'</textarea><label>Niveau de preuve</label><select id="mcAsVerif">'+opts(niveaux,a.verification||'none')+'</select><label>Preuve (obligatoire pour un test : <code>{"command":"...","exit_code":0}</code>)</label><textarea id="mcAsEvidence">'+esc(preuve)+'</textarea>',async()=>{const brut=($('mcAsEvidence').value||'').trim();let evidence={};if(brut){try{evidence=JSON.parse(brut)}catch(_){throw Error('Preuve : JSON invalide')}}await post('assignment/update',{id:a.id,status:$('mcAsStatus').value,result:$('mcAsResult').value,verification:$('mcAsVerif').value,evidence})})});
+  const etabli=['test','validated','approved','refused'].indexOf(a.verification)>=0;
+  const champ=etabli?'<p>Preuve : <strong>'+esc(libellePreuve(a.verification))+"</strong>. Le serveur l\'a établie. Ce formulaire ne la remplace pas.</p>":'<label>Déclaration</label><select id="mcAsVerif">'+opts([['none','Non vérifié'],['declared','Déclaré'],['human','Revu par une personne']],a.verification||'none')+'</select>';
+  modal('Mettre à jour le suivi','<p class="subtle">Une revue humaine est une lecture. Un test exécuté ou une validation ne se déclarent pas ici.</p><label>Statut</label><select id="mcAsStatus">'+opts([['queued','À faire'],['working','En cours'],['blocked','Bloqué'],['done','Terminé'],['reviewed','Revu']],a.status)+'</select><label>Résultat</label><textarea id="mcAsResult">'+esc(a.result)+'</textarea>'+champ,async()=>{const corps={id:a.id,status:$('mcAsStatus').value,result:$('mcAsResult').value};if(!etabli)corps.verification=$('mcAsVerif').value;await post('assignment/update',corps)},'Enregistrer le suivi')});
 }
 function render(){remplirActeurs();$('mcStage').style.display=mode==='agents'?'block':'none';$('mcRecords').style.display=mode==='missions'?'block':'none';if(mode==='agents'){renderCanvas();if(chosen&&data.agents.some(a=>a.id===chosen))detail(chosen)}else renderRecords()}
-setInterval(()=>{tic++;if(page!=='mission'||drag||window.mcModal||$('mcDetails').style.display!=='none')return;
+setInterval(()=>{tic++;if(window.mcPage!=='mission'||drag||window.mcModal||$('mcDetails').style.display!=='none')return;
  // Rafraîchissement rapproché tant qu'un job travaille, lent sinon.
  const actif=(data.jobs||[]).some(j=>['running','queued','paused'].indexOf(j.status)>=0);
  if(actif||tic%6===0)refresh();},2500);
+function surveillerService(){
+ const dot=document.getElementById('serviceDot');
+ if(!dot)return;
+ fetch('/api/mc/version',{headers:entetes()}).then(r=>{
+  dot.classList.toggle('hors-ligne',!r.ok);
+  dot.setAttribute('aria-label',r.ok?'Service local en ligne':'Service local injoignable');
+ }).catch(()=>{dot.classList.add('hors-ligne');dot.setAttribute('aria-label','Hors ligne : le service local ne répond pas');});
+}
+surveillerService();
+setInterval(surveillerService,15000);
+document.addEventListener('keydown',e=>{
+ if(e.key==='Escape'&&window.mcModal){e.preventDefault();fermerModal();return;}
+ if(e.key!=='Tab')return;
+ const boite=window.mcModal?$('modalback'):(document.getElementById('mcAuth')&&document.getElementById('mcAuth').open?document.getElementById('mcAuth'):null);
+ if(!boite||(boite.id==='modalback'&&!boite.classList.contains('open')))return;
+ const focusables=[...boite.querySelectorAll('button,input,select,textarea')].filter(el=>!el.disabled&&el.offsetParent!==null);
+ if(focusables.length<2)return;
+ const premier=focusables[0],dernier=focusables[focusables.length-1];
+ if(e.shiftKey&&document.activeElement===premier){e.preventDefault();dernier.focus();}
+ else if(!e.shiftKey&&document.activeElement===dernier){e.preventDefault();premier.focus();}
+});
+let essaisProjet=0;
+function demarrerMission(){
+ essaisProjet++;
+ if(!getProject()&&essaisProjet<40){setTimeout(demarrerMission,50);return;}
+ open();
+}
+demarrerMission();
 })();

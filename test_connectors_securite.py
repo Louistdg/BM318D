@@ -206,10 +206,14 @@ class Tests(unittest.TestCase):
         import socket as socket_module
         original=socket_module.create_connection
         observed=[]
-        def pinned_connect(address,timeout=None,source_address=None,all_errors=False):
+        def pinned_connect(address, timeout=None, source_address=None, *args, **kwargs):
             observed.append(address)
             self.assertEqual(address[0],'127.0.0.1')
-            return original(('127.0.0.1',address[1]),timeout,source_address,all_errors=all_errors)
+            cible=('127.0.0.1', address[1])
+            try:
+                return original(cible, timeout, source_address, *args, **kwargs)
+            except TypeError:
+                return original(cible, timeout, source_address)
         url='http://localhost:'+str(self.http.server_port)+'/api/tags'
         with mock.patch.object(cx,'_adresses',return_value={__import__('ipaddress').ip_address('127.0.0.1')}), \
              mock.patch.object(cx.socket,'create_connection',side_effect=pinned_connect):

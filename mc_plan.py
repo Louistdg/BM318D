@@ -20,17 +20,26 @@ class PlanInvalide(Exception):
 
 def memoire_libre_mo():
     """Mémoire physique disponible, sans dépendance externe."""
-    class Etat(ctypes.Structure):
-        _fields_ = [('dwLength', ctypes.c_ulong), ('dwMemoryLoad', ctypes.c_ulong),
-                    ('ullTotalPhys', ctypes.c_ulonglong), ('ullAvailPhys', ctypes.c_ulonglong),
-                    ('ullTotalPageFile', ctypes.c_ulonglong), ('ullAvailPageFile', ctypes.c_ulonglong),
-                    ('ullTotalVirtual', ctypes.c_ulonglong), ('ullAvailVirtual', ctypes.c_ulonglong),
-                    ('ullAvailExtendedVirtual', ctypes.c_ulonglong)]
-    etat = Etat()
-    etat.dwLength = ctypes.sizeof(Etat)
-    if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(etat)):
+    if hasattr(ctypes, 'windll'):
+        class Etat(ctypes.Structure):
+            _fields_ = [('dwLength', ctypes.c_ulong), ('dwMemoryLoad', ctypes.c_ulong),
+                        ('ullTotalPhys', ctypes.c_ulonglong), ('ullAvailPhys', ctypes.c_ulonglong),
+                        ('ullTotalPageFile', ctypes.c_ulonglong), ('ullAvailPageFile', ctypes.c_ulonglong),
+                        ('ullTotalVirtual', ctypes.c_ulonglong), ('ullAvailVirtual', ctypes.c_ulonglong),
+                        ('ullAvailExtendedVirtual', ctypes.c_ulonglong)]
+        etat = Etat()
+        etat.dwLength = ctypes.sizeof(Etat)
+        if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(etat)):
+            return None
+        return int(etat.ullAvailPhys / (1024 * 1024))
+    try:
+        with open('/proc/meminfo', encoding='ascii') as fichier:
+            for ligne in fichier:
+                if ligne.startswith('MemAvailable:'):
+                    return int(ligne.split()[1]) // 1024
+    except (OSError, ValueError, IndexError):
         return None
-    return int(etat.ullAvailPhys / (1024 * 1024))
+    return None
 
 
 def cpu_charge(intervalle=0.2):

@@ -1,15 +1,15 @@
 """BM318d — petite fenêtre de contrôle, sans terminal.
 
 Elle ne remplace pas la page web : elle sert à voir si le service tourne, à
-l'ouvrir, à le sauvegarder et à l'arrêter proprement. Toute la logique passe par
-l'API déjà protégée par jeton ; la fenêtre ne connaît aucun secret.
+l'ouvrir, à le sauvegarder et à l'arrêter proprement. L'arrêt et la sauvegarde
+n'affichent un succès que si le serveur le confirme. Le jeton administrateur est
+lu dans logs/admin-token.txt et n'est ni affiché ni journalisé.
 """
 import json
 import os
 import re
 import subprocess
 import sys
-import tkinter as tk
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -31,15 +31,75 @@ def jeton():
     return trouve.group(1) if trouve else None
 
 
-def appel(chemin, corps=None):
+def jeton_admin():
+    chemin = LOGS / 'admin-token.txt'
+    if not chemin.is_file():
+        return None
+    valeur = chemin.read_text(encoding='utf-8').strip()
+    return valeur or None
+
+
+def appel(chemin, corps=None, admin=False):
     j = jeton()
     if not j:
-        raise RuntimeError('Jeton introuvable')
+        raise RuntimeError('Jeton de session introuvable')
+    entetes = {'Content-Type': 'application/json', 'X-MC-Token': j}
+    if admin:
+        a = jeton_admin()
+        if not a:
+            raise RuntimeError('Jeton administrateur absent')
+        entetes['X-MC-Admin'] = a
     donnees = json.dumps(corps or {}).encode()
-    requete = urllib.request.Request(URL + chemin, data=donnees, method='POST',
-                                     headers={'Content-Type': 'application/json', 'X-MC-Token': j})
+    requete = urllib.request.Request(URL + chemin, data=donnees, method='POST', headers=entetes)
     with urllib.request.urlopen(requete, timeout=8) as r:
         return json.loads(r.read().decode('utf-8', 'replace'))
+
+
+def _texte_erreur(e):
+    if isinstance(e, urllib.error.HTTPError):
+        return 'refus %s' % e.code
+    if isinstance(e, RuntimeError):
+        return str(e)[:80]
+    return 'erreur'
+
+
+def projet_connu():
+    try:
+        j = jeton()
+        if not j:
+            raise ValueError('Session absente')
+        requete = urllib.request.Request(URL + 'api/state', headers={'X-MC-Token': j})
+        with urllib.request.urlopen(requete, timeout=4) as r:
+            etat = json.loads(r.read().decode('utf-8', 'replace'))
+        projets = etat.get('projects') or []
+        projet = projets[0][0]
+        if type(projet) is not int or projet <= 0:
+            raise ValueError('Projet invalide')
+        return projet
+    except Exception as e:
+        if isinstance(e, urllib.error.HTTPError):
+            e.close()
+        raise RuntimeError('Projet indisponible : réessayer après rétablissement du service') from None
+
+
+def tenter_arret():
+    try:
+        r = appel('api/mc/shutdown', {'project': projet_connu()}, admin=True)
+    except Exception as e:
+        return False, 'Le service tourne encore (' + _texte_erreur(e) + ')'
+    if not isinstance(r, dict) or r.get('ok') is not True:
+        return False, 'Le service tourne encore : arrêt non confirmé'
+    return True, 'Arrêt confirmé par le serveur'
+
+
+def tenter_sauvegarde():
+    try:
+        r = appel('api/mc/backup', {'project': projet_connu()}, admin=True)
+    except Exception as e:
+        return False, 'Sauvegarde non confirmée (' + _texte_erreur(e) + ')'
+    if not isinstance(r, dict) or not r.get('file'):
+        return False, 'Sauvegarde non confirmée'
+    return True, 'Sauvegarde : ' + str(r.get('file'))
 
 
 def en_ligne():
@@ -61,6 +121,7 @@ def demarrer():
 
 class Fenetre:
     def __init__(self, racine):
+        import tkinter as tk
         self.racine = racine
         self.age = 0
         racine.title('BM318d Control Center')
@@ -82,19 +143,17 @@ class Fenetre:
         webbrowser.open(URL)
 
     def sauvegarder(self):
-        try:
-            r = appel('api/mc/backup')
-            self.detail.config(text='Sauvegarde : ' + str(r.get('file')))
-        except Exception as e:
-            self.detail.config(text='Erreur : ' + str(e)[:80])
+        ok, message = tenter_sauvegarde()
+        self.detail.config(text=message[:120])
 
     def arreter(self):
-        try:
-            appel('api/mc/shutdown')
-            self.statut.config(text='Arrêt demandé')
-        except Exception as e:
-            self.detail.config(text='Erreur : ' + str(e)[:80])
-        self.racine.after(800, self.racine.destroy)
+        ok, message = tenter_arret()
+        self.detail.config(text=message[:120])
+        if ok:
+            self.statut.config(text='Arrêt confirmé')
+            self.racine.after(800, self.racine.destroy)
+        else:
+            self.statut.config(text='Le service tourne encore', fg='#a33')
 
     def rafraichir(self):
         if en_ligne():
@@ -111,6 +170,7 @@ class Fenetre:
 
 
 def main():
+    import tkinter as tk
     racine = tk.Tk()
     Fenetre(racine)
     racine.mainloop()
