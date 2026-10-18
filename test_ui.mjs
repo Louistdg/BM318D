@@ -146,6 +146,8 @@ try {
   await c.naviguer(base_url);
   await sleep(1200);
   t('aucune erreur JavaScript au chargement', c.erreurs().length === 0, c.erreurs());
+  t('le canevas démarre avec un zoom plus rapproché', await c.evaluate(`document.getElementById('world').style.transform.includes('scale(1.15)')`));
+  t('la palette bleu ardoise et accent ciel est appliquée', await c.evaluate(`getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()==='#0c1420' && getComputedStyle(document.documentElement).getPropertyValue('--violet').trim()==='#82cfff'`));
   await c.evaluate(`document.querySelector('.legacy-nav[data-page=\"overview\"]').click()`); await sleep(300);
   t('la vue d’ensemble ne fabrique pas d’agents', await c.evaluate(`!/IA 1|Architecture|Développement|Audit/.test(document.getElementById('agentCards').textContent)`));
   await c.evaluate(`document.querySelector('.legacy-nav[data-page=\"canvas\"]').click()`);
