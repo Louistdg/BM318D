@@ -5,6 +5,7 @@ import mc_agent
 import mc_plan
 import mc_connectors
 import mc_security
+import mc_documents
 import contextvars,functools,inspect
 ROOT=Path(__file__).resolve().parent
 spec=importlib.util.spec_from_file_location('legacy',ROOT/'BM318d-WebServer.py')
@@ -38,8 +39,12 @@ def init():
  # One coherent SQLite backup before the first additive V2.2 migration.
  with connect() as probe:
   needs_v22=not probe.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mc_connectors'").fetchone()
+ with connect() as probe:
+  needs_documents=not probe.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mc_documents'").fetchone()
  if needs_v22 and DB.exists():
   sauvegarder(DB.parent/'backups'/('v22-before-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.sqlite3'))
+ if needs_documents and DB.exists():
+  sauvegarder(DB.parent/'backups'/('before-documents-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.sqlite3'))
  with connect() as c:
   c.executescript("""
   CREATE TABLE IF NOT EXISTS mc_agents(
@@ -160,6 +165,7 @@ def init():
   # Reprise apres crash : un job reste « running » alors que le processus a disparu.
   c.execute("UPDATE mc_jobs SET status='failed',error='interrompu par un redémarrage du serveur',finished_at=CURRENT_TIMESTAMP WHERE status='running'")
   mc_connectors.migrate(c)
+  mc_documents.migrate(c)
 
 def sauvegarder(destination=None):
  # Copie en ligne (API backup de SQLite) : coherente meme si le serveur ecrit.
@@ -800,6 +806,8 @@ def _dispatch(c,path,d):
   mc_security.revoke(required_text(d,'grant_id',100));return {'revoked':True}
  if path.startswith('/api/mc/connectors/'):
   return mc_connectors.dispatch(c,p,path.rsplit('/',1)[-1],d)
+ if path=='/api/mc/documents/save':return mc_documents.save(c,p,d)
+ if path=='/api/mc/documents/delete':return mc_documents.delete(c,p,d)
  if path=='/api/mc/agent':
   name=required_text(d,'name',100);role=required_text(d,'role',40)
   if not role_valide(c,p,role):raise ValueError('Rôle inconnu')
@@ -1066,21 +1074,28 @@ class Handler(legacy.Handler):
   if not self._hote_ok():return self._refus(421,'Hôte non autorisé')
   if self.path=='/':
    html=(ROOT/'BM318d-Railway.html').read_text(encoding='utf-8')
-   html=html.replace('</head>','<meta name="mc-token" content="'+TOKEN+'"><link rel="stylesheet" href="/mission.css"></head>')
-   html=html.replace('</body>','<script src="/mission.js"></script><script src="/security-ui.js"></script><script src="/connectors.js"></script></body>')
+   html=html.replace('</head>','<meta name="mc-token" content="'+TOKEN+'"><link rel="stylesheet" href="/mission.css"><link rel="stylesheet" href="/workspace.css"></head>')
+   html=html.replace('</body>','<script src="/mission.js"></script><script src="/security-ui.js"></script><script src="/connectors.js"></script><script src="/workspace.js"></script></body>')
    b=html.encode()
    self.send_response(200);self.send_header('Content-Type','text/html; charset=utf-8')
    self.send_header('Content-Length',str(len(b)));self.send_header('Cache-Control','no-store')
    self.send_header('X-Content-Type-Options','nosniff');self.send_header('Referrer-Policy','no-referrer')
    self.send_header('Set-Cookie','mc_token='+TOKEN+'; Path=/; HttpOnly; SameSite=Strict')
    self.end_headers();self.wfile.write(b);return
-  if self.path in ('/mission.js','/mission.css','/connectors.js','/security-ui.js'):
+  if self.path in ('/mission.js','/mission.css','/connectors.js','/security-ui.js','/workspace.js','/workspace.css'):
    path=ROOT/self.path[1:];b=path.read_bytes()
    self.send_response(200);self.send_header('Content-Type','text/javascript' if self.path.endswith('.js') else 'text/css')
    self.send_header('Content-Length',str(len(b)));self.send_header('Cache-Control','no-store')
    self.send_header('X-Content-Type-Options','nosniff');self.end_headers();self.wfile.write(b);return
   if self.path.startswith('/api/'):
    if not self._api_autorisee():return
+   if self.path.startswith('/api/mc/documents?'):
+    from urllib.parse import parse_qs,urlsplit
+    try:
+     p=int(parse_qs(urlsplit(self.path).query)['project'][0])
+     with connect() as c:project(c,p);self.reply(mc_documents.items(c,p))
+    except (ValueError,KeyError) as e:self.reply({'error':str(e)},400)
+    return
    if self.path.startswith('/api/mc/context?'):
     from urllib.parse import parse_qs,urlsplit
     try:
@@ -1186,6 +1201,7 @@ class Handler(legacy.Handler):
     with LOCK,connect() as c:result=dispatch(c,self.path,d,principal=self.principal)
    self.reply({'ok':True,**result},201)
   except PermissionError as e:self.reply({'error':str(e)},403)
+  except mc_documents.RevisionConflict as e:self.reply({'error':str(e)},409)
   except (ValueError,KeyError,TypeError,sqlite3.Error) as e:self.reply({'error':str(e)},400)
 if __name__=='__main__':
  import sys

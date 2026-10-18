@@ -96,7 +96,7 @@ function createLink(){
  if(data.agents.length<2){toast('Il faut au moins deux agents');return}
  modal('Relier deux agents','<label>Source</label><select id="mcSource">'+agentOptions(false)+'</select><label>Destination</label><select id="mcTarget">'+agentOptions(false)+'</select><label>Type de connexion</label><select id="mcKind"><option value="communication">Communication</option><option value="dependency">Dépendance</option></select>',()=>post('link',{source_id:Number($('mcSource').value),target_id:Number($('mcTarget').value),kind:$('mcKind').value}))}
 const nav=document.querySelector('.rail');
-const button=document.createElement('button');button.type='button';button.textContent='MC';button.title='Mission Control';button.setAttribute('aria-label','Mission Control');button.dataset.page='mission';button.onclick=()=>open();
+const button=document.createElement('button');button.type='button';button.textContent='◎';button.title='Mission Control';button.setAttribute('aria-label','Mission Control');button.dataset.page='mission';button.onclick=()=>open();
 const logo=nav.querySelector('.logo');nav.insertBefore(button,logo?logo.nextSibling:nav.firstChild);
 const ancien=document.createElement('button');ancien.type='button';ancien.id='ancienTableau';ancien.textContent='Ancien tableau';ancien.title="Canvas, tâches et journal d'origine";
 ancien.onclick=()=>{nav.classList.add('legacy-open');document.body.classList.add('legacy-page');window.mcPage='legacy';const cible=nav.querySelector('button[data-page="canvas"]');if(cible)cible.click();};
@@ -420,7 +420,7 @@ let essaisProjet=0;
 function demarrerMission(){
  essaisProjet++;
  if(!getProject()&&essaisProjet<40){setTimeout(demarrerMission,50);return;}
- open();
+ window.mcPage='legacy';nav.classList.add('legacy-open');document.body.classList.add('legacy-page');showPage('canvas');
 }
 demarrerMission();
 })();

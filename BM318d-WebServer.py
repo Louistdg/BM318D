@@ -86,6 +86,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
     p=int(d['project']);name=str(d['title']).strip()[:300]
     if not name or not db('SELECT 1 FROM projects WHERE id=?',(p,)):raise ValueError('task')
     result=db('INSERT INTO tasks(project_id,title,priority,agent) VALUES(?,?,?,?)',(p,name,str(d.get('priority','Normale'))[:30],str(d.get('agent','IA 1'))[:80]),True)
+   elif self.path=='/api/task/update':
+    p=int(d['project']);ident=int(d['id'])
+    title=str(d['title']).strip()
+    if not title or len(title)>300 or not db('SELECT 1 FROM tasks WHERE id=? AND project_id=?',(ident,p)):raise ValueError('Tâche introuvable ou titre invalide')
+    result=db('UPDATE tasks SET title=?,priority=?,agent=? WHERE id=? AND project_id=?',(title,str(d['priority'])[:30],str(d['agent'])[:80],ident,p),True)
    elif self.path=='/api/status':
     result=db('UPDATE tasks SET status=? WHERE id=? AND project_id=?',(str(d['status'])[:50],int(d['id']),int(d['project'])),True)
    elif self.path=='/api/position':

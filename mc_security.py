@@ -109,6 +109,7 @@ ROUTES={
  'permissions':'admin','settings':'admin','backup':'admin','restore':'admin','shutdown':'admin',
  'plan':'manage','plan/apply':'manage','orchestrator/run':'manage','charge':'manage',
  'security/token':'admin','security/revoke':'admin',
+ 'documents/save':'manage','documents/delete':'manage',
 }
 
 def authorize_route(c,path,d):
