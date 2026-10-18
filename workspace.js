@@ -10,11 +10,22 @@
  const clamp = value => Math.max(175, Math.min(410, Math.round(Number(value) || 245)));
  let width = clamp(localStorage.getItem(widthKey) || 245);
  let collapsed = localStorage.getItem(collapsedKey) === 'true';
- const labels = {canvas:'Canevas',overview:"Vue d’ensemble",tasks:'Tâches',agents:'Agent IA local',events:'Journal',documents:'Dossiers & fiches',mission:'Mission Control'};
- const symbols = {canvas:'◇',overview:'▦',tasks:'☷',agents:'◈',events:'▤',documents:'▣',mission:'◎'};
+ const labels = {canvas:'Canevas',overview:"Vue d’ensemble",tasks:'Tâches',agents:'Agent IA local',events:'Journal',documents:'Dossiers & fiches',mission:'Mission Control',connectors:'Connecteurs IA',reset:'Recentrer le canevas'};
+ const iconPaths = {
+   canvas:'<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 4v16M4 11h16"/>',
+   overview:'<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="5" rx="1.5"/><rect x="13" y="11" width="7" height="9" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/>',
+   tasks:'<path d="m5 7 1.5 1.5L9 6M11 7h8M5 14l1.5 1.5L9 13m2 2h8"/><path d="M5 20h14"/>',
+   agents:'<path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 4v-4.2A2.5 2.5 0 0 1 5 13.5z"/><path d="m13 7 .8 1.8L16 9.5l-2.2.7L13 12l-.8-1.8-2.2-.7 2.2-.7z"/>',
+   events:'<rect x="5" y="4" width="14" height="17" rx="3"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+   documents:'<path d="M3.5 7.5A2.5 2.5 0 0 1 6 5h4l2 2h6a2.5 2.5 0 0 1 2.5 2.5v8A2.5 2.5 0 0 1 18 20H6a2.5 2.5 0 0 1-2.5-2.5z"/><path d="M4 10h16"/>',
+   mission:'<circle cx="6" cy="7" r="2.2"/><circle cx="18" cy="6" r="2.2"/><circle cx="12" cy="18" r="2.2"/><path d="m8 7 7.7-.8M7.4 9l3.5 6.8m5.7-7.7-3.5 8"/>',
+   connectors:'<path d="M8 8V4m8 4V4M6 8h12v4a6 6 0 0 1-6 6v2m0-2v2"/>',
+   reset:'<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/>'
+ };
+ const icon = key => '<svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'+(iconPaths[key]||iconPaths.canvas)+'</svg>';
   const side=document.createElement('aside');side.id='workspaceSidebar';side.className='workspace-sidebar';
   const groups=[['ESPACE DE TRAVAIL',['canvas','overview','tasks','agents','documents','events']],['ORGANISATION',['mission','connectors']]];
-  side.innerHTML='<div class="workspace-sidehead"><span>ESPACE PROJET</span><button id="workspaceCollapse" type="button" aria-label="Réduire le panneau">‹</button></div><div class="workspace-project"><strong>✦ <span id="workspaceProjectName">Projet</span></strong><small>Projet local</small></div>'+groups.map(([title,items])=>'<div class="workspace-label">'+title+'</div>'+items.map(key=>'<button type="button" class="workspace-link" data-workspace-page="'+key+'"><span class="workspace-icon">'+(symbols[key]||'⌘')+'</span><span>'+safe(labels[key]||(key==='connectors'?'Connecteurs IA':''))+'</span></button>').join('')).join('')+'<div class="workspace-foot">LOCAL · SQLite<br><small>Les données restent sur cet appareil.</small></div><div id="workspaceGrip" class="workspace-grip" role="separator" tabindex="0" aria-label="Ajuster la largeur du panneau" aria-orientation="vertical" aria-valuemin="175" aria-valuemax="410"></div>';
+  side.innerHTML='<div class="workspace-sidehead"><span>ESPACE PROJET</span><button id="workspaceCollapse" type="button" aria-label="Réduire le panneau">‹</button></div><div class="workspace-project"><strong>✦ <span id="workspaceProjectName">Projet</span></strong><small>Projet local</small></div>'+groups.map(([title,items])=>'<div class="workspace-label">'+title+'</div>'+items.map(key=>'<button type="button" class="workspace-link" data-workspace-page="'+key+'"><span class="workspace-icon">'+icon(key)+'</span><span>'+safe(labels[key])+'</span></button>').join('')).join('')+'<div class="workspace-foot">LOCAL · SQLite<br><small>Les données restent sur cet appareil.</small></div><div id="workspaceGrip" class="workspace-grip" role="separator" tabindex="0" aria-label="Ajuster la largeur du panneau" aria-orientation="vertical" aria-valuemin="175" aria-valuemax="410"></div>';
   rail.after(side);
   const emptyNewTask=document.getElementById('emptyNewTask'),emptyOverview=document.getElementById('emptyOverview');
   if(emptyNewTask)emptyNewTask.onclick=()=>document.getElementById('newTask')?.click();
@@ -49,12 +60,12 @@
  rail.insertBefore(missionButton,rail.querySelector('#reset'));
  for (const b of rail.querySelectorAll('button[data-page]')) {
    const p=b.dataset.page;
-    b.innerHTML='<span class="nav-icon" aria-hidden="true">'+symbols[p]+'</span>';
+   b.innerHTML='<span class="nav-icon">'+icon(p)+'</span>';
    b.setAttribute('aria-label',labels[p]);
    b.title=labels[p];
  }
  const reset=rail.querySelector('#reset');
-  if (reset) {reset.setAttribute('aria-label','Recentrer le canevas');reset.innerHTML='<span class="nav-icon" aria-hidden="true">⌖</span>';}
+  if (reset) {reset.setAttribute('aria-label','Recentrer le canevas');reset.innerHTML='<span class="nav-icon">'+icon('reset')+'</span>';}
  widthApply(width);collapsedApply(collapsed);
  if(mobile())toggle.setAttribute('aria-expanded','false');
   let resizing=false;const grip=document.getElementById('workspaceGrip');

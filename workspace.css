@@ -254,3 +254,15 @@ input:focus,textarea:focus,select:focus{border-color:#82cfff;box-shadow:0 0 0 3p
 .brand-mark{display:block;width:25px;height:25px;overflow:visible}
 .brand-mark path{fill:none;stroke:#10273a;stroke-width:2.7;stroke-linecap:round;stroke-linejoin:round}
 .brand-mark circle{fill:#f1fbff;stroke:#10273a;stroke-width:1.5}
+.rail .nav-icon{width:24px;min-width:24px;height:24px;display:grid;place-items:center;font-size:0}
+.icon-svg{display:block;width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;transition:transform .16s ease,color .16s ease}
+.rail button[data-page],.rail #reset{transition:background .16s ease,border-color .16s ease,color .16s ease,transform .16s ease}
+.rail button[data-page]:hover,.rail #reset:hover{transform:translateY(-1px)}
+.rail button[data-page].active .icon-svg{stroke-width:2}
+.workspace-link{min-height:40px;gap:9px;padding:5px 9px;border-radius:11px;transition:background .16s ease,color .16s ease,transform .16s ease}
+.workspace-link:hover{transform:translateX(2px)}
+.workspace-icon{width:30px;height:30px;display:grid;place-items:center;border:1px solid #30475a;border-radius:10px;background:#17283a;color:#a8cce1}
+.workspace-link.active .workspace-icon{border-color:#477692;background:#1b3b50;color:#a3e2ff;box-shadow:0 4px 12px #07111d66}
+.workspace-icon .icon-svg{width:16px;height:16px}
+.workspace-link.active{color:#f4fbff}
+@media(prefers-reduced-motion:reduce){.icon-svg,.rail button[data-page],.rail #reset,.workspace-link{transition:none}}
