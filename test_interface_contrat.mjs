@@ -9,6 +9,8 @@ const html = fs.readFileSync(new URL('./BM318d-Railway.html', import.meta.url), 
 const securite = fs.readFileSync(new URL('./security-ui.js', import.meta.url), 'utf8');
 const connecteurs = fs.readFileSync(new URL('./connectors.js', import.meta.url), 'utf8');
 const workspace = fs.readFileSync(new URL('./workspace.js', import.meta.url), 'utf8');
+assert.ok(mission.includes('Chaque projet peut utiliser son propre dossier local'));
+assert.ok(mission.includes('les sauvegardes BM318d couvrent la base SQLite, pas les fichiers importés'));
 
 function extraire(source, nom) {
   const marque = 'function ' + nom;

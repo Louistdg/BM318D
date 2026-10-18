@@ -31,3 +31,7 @@ The initial discovery review is recorded in `GROK-MISSION-01-PRODUCT-AUDIT.md`. 
 The project canvas is the home screen and preserves existing task positions and dependencies. The overview uses the real project tasks and registered agents; Mission Control remains available in the application navigation. Both Railway launchers start the authenticated local service (port 31880).
 
 `OUVRIR-BM318d.cmd` only opens a local `index.html` export when that file exists beside the scripts. It does not start the service. The other `LANCER-*.cmd` files still open the older desktop windows (Studio, Unifié, Extensions, `BM318d.pyw`).
+
+## Imported project files
+
+Imported files are copied into the selected project's local workspace, under `p<project-id>/fichiers-importes/`; the selected folder structure is reflected below that directory. The original file is left in place. Notes and file metadata remain in SQLite, but SQLite backups do **not** include the copied file contents. Include each project's configured workspace folder in the user's regular file backups. Removing an imported-file card from the interface currently removes only its BM318d record, not the physical file.

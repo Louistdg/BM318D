@@ -1,4 +1,4 @@
-import tempfile,sqlite3
+import os,tempfile,sqlite3
 from pathlib import Path
 from test_support_v23 import broker_fixture
 import MissionControl as mc
@@ -47,7 +47,7 @@ with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
  assert Path(job['workspace']).is_dir()
  try:call('/api/mc/settings',key='workspace_dir',value='chemin-relatif');raise AssertionError('Relative workspace accepted')
  except ValueError:pass
- if mc.os.name=='nt':
+ if os.name=='nt':
   for bad in ('E:\\BM318d-test','C:\\'):
    try:call('/api/mc/settings',key='workspace_dir',value=bad);raise AssertionError('Unsafe drive accepted: '+bad)
    except ValueError:pass
