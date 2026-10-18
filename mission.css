@@ -1,0 +1,18 @@
+.mc-toolbar{display:flex;gap:10px;align-items:center;padding:12px 22px;border-bottom:1px solid #302c3d}.mc-stage{position:relative;height:calc(100% - 63px);overflow:hidden;background-color:#13111b;background-image:radial-gradient(#302a3d 1px,transparent 1px);background-size:23px 23px}.mc-world{position:absolute;inset:0;width:5000px;height:5000px;transform-origin:0 0}.mc-node{position:absolute;width:235px;border-radius:17px;background:#201c2b;border:1px solid #494053;box-shadow:0 12px 30px #0005;cursor:grab;user-select:none;overflow:hidden}.mc-node:hover{border-color:#b59af6}.mc-node.dragging{cursor:grabbing}.mc-node .mc-head{padding:16px}.mc-node .mc-role{color:#aaa0bc;font-size:12px;margin:8px 0}.mc-node .mc-foot{border-top:1px solid #393244;padding:12px 16px;font-size:12px;color:#c7b8dc}.mc-node .mc-dot{display:inline-block;width:8px;height:8px;background:#938da3;border-radius:50%;margin-right:8px}.mc-node[data-status=working] .mc-dot{background:#e7b873}.mc-node[data-status=done] .mc-dot{background:#65c99c}.mc-node[data-status=blocked] .mc-dot{background:#ee8396}.mc-links{position:absolute;inset:0;width:5000px;height:5000px;pointer-events:none}.mc-legend{position:absolute;bottom:22px;left:24px;color:#b2a5c6;background:#211b2dc9;border:1px solid #43364f;border-radius:12px;padding:12px;pointer-events:none}.mc-side{position:absolute;right:15px;top:15px;width:320px;max-height:calc(100% - 30px);overflow:auto;background:#211c2c;border:1px solid #50445e;border-radius:16px;padding:18px;box-shadow:0 15px 50px #0009}.mc-side label{display:block;margin:12px 0 6px;color:#a9a0b9;font-size:12px}.mc-side h3{margin:5px 0 12px}.mc-side button{margin-top:10px}.mc-summary{display:flex;gap:9px;flex-wrap:wrap;margin:12px 0}.mc-summary span{border-radius:10px;background:#2a2437;padding:8px 11px;color:#d5c8e8}.mc-record{padding:13px;background:#211c2c;border:1px solid #3c3349;border-radius:12px;margin:9px 0}.mc-record small{color:#a99cb8}.mc-record p{white-space:pre-wrap;overflow-wrap:anywhere}.mc-empty{padding:28px;color:#b6a8c8}.mc-tabs{display:flex;gap:8px;margin:14px 0}.mc-tabs button.active{background:#5c467a}.mc-modal{max-height:85vh;overflow:auto}.mc-modal textarea{min-height:95px}.mc-toast{z-index:100}
+
+.mc-zones{position:absolute;inset:0}
+.mc-zone{position:absolute;border:1px dashed #4a3f5c;border-radius:20px;background:#1b172433}
+.mc-zone>span{position:absolute;top:-11px;left:16px;background:#211c2c;border:1px solid #4a3f5c;border-radius:9px;padding:2px 9px;color:#b9a6e8;font-size:11px}
+.mc-node.selectionne{border-color:#6ac6a2;box-shadow:0 0 0 2px #6ac6a244,0 12px 30px #0005}
+.mc-minimap{position:absolute;right:16px;bottom:16px;width:200px;height:120px;border:1px solid #43364f;border-radius:12px;overflow:hidden;background:#191524;opacity:.92}
+.mc-minimap canvas{display:block;width:100%;height:100%}
+.mc-record .warn{color:#e7b873}
+
+/* --- ameliorations visuelles V2.3 : barre Mission Control --- */
+.mc-toolbar{flex-wrap:wrap;row-gap:8px;gap:8px;align-items:center}
+.mc-toolbar>strong{font-size:15px;white-space:nowrap;margin-right:2px}
+.mc-toolbar>label{display:flex;align-items:center;gap:6px;font-size:11.5px;color:#9a92ab;white-space:nowrap}
+.mc-toolbar select{min-width:170px;max-width:240px}
+.mc-toolbar button{padding:8px 12px;font-size:12.5px;white-space:nowrap}
+#mcNodes:empty::after{content:"Aucun agent pour l instant — cree un agent avec le bouton « + Agent ».";position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);color:#938fa4;font-size:13px;text-align:center;max-width:420px;line-height:1.6}
+#mcRecherche{max-width:320px;flex:0 0 320px}

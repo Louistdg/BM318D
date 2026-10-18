@@ -1,0 +1,101 @@
+BM318d MISSION CONTROL - VERSION EXPERIMENTALE
+
+Lancement : double-cliquer sur LANCER-MISSION-CONTROL.cmd
+Adresse locale : http://127.0.0.1:31880/
+
+Dans la barre latérale, cliquer sur l'icone ♜ (Mission Control).
+
+1. + Agent : creer des assistants de roles differents, choisir equipe et responsable.
+2. Deplacer les cartes sur le canvas : positions persistantes dans SQLite.
+3. Cliquer sur un agent : modifier son equipe, son responsable et son statut.
+4. Lors d'un changement de responsable, une passation est historisee.
+5. Dossier de passation : contexte construit a partir des notes, missions, collegues et transferts ; non envoye automatiquement.
+6. + Mission : objectif global. + Attribution : tache affectee a un agent.
+7. Missions & preuves : trois niveaux distincts — « declare » (on affirme), « revu
+   par un humain », « test reellement execute » (commande + code de sortie obligatoires).
+   L'ancienne case « verifie » ne melange plus les trois.
+8. + Contexte : notes de projet, equipe ou agent.
+9. Connexion : liens de communication ou dependance entre agents ; cycles refuses.
+10. + Job : un agent travaille dans un dossier isole (workspaces\p<projet>\a<agent>\job<n>).
+    Le modele propose des fichiers, on voit le diff, on approuve ou on refuse : rien
+    n'est ecrit avant l'approbation. « Lancer les tests » execute unittest dans ce
+    dossier et enregistre la preuve (commande, code de sortie, duree, sortie).
+    Commandes autorisees, et seulement celles-la : unittest, py_compile, node_check.
+    Un test reussi fait passer l'attribution en verification « test ».
+11. + Plan : le modele decoupe un objectif en taches, avec roles et dependances. On
+    applique le plan (les jobs sont crees) ou on le refuse. « Orchestrer » lance les
+    jobs prets, dans la limite de charge.
+12. Memoire (P4) : notes de projet / equipe / agent, versionnees (une note peut en
+    remplacer une autre) ; decisions techniques avec justification obligatoire ;
+    messages cibles a un agent ou a une equipe, avec accuse de lecture ; passations
+    qui portent le contexte complet et demandent un acquittement du nouveau responsable.
+13. Canvas (P3) : zones par equipe, glisser une carte dans une autre zone change
+    d'equipe, Maj+clic pour selectionner plusieurs cartes, minimap, « Aligner ».
+14. Controle qualite (P5) : sur un job applique, « Audit secu » analyse le diff
+    (eval, exec, shell=True, os.system, chemins systeme...), « Revue code » enregistre
+    un verdict et des constats, « Valider » exige un test reussi ET des revues sans
+    probleme, « Commit » cree un commit git dans le workspace, « Rapport » rassemble
+    diff, preuve, revues et journal.
+15. Equipes (P6) : « + Role » ajoute un role au projet ; « Recruter » cree une demande
+    qui ne devient un agent qu'apres acceptation ; « Dupliquer » et « Archiver » dans
+    le panneau d'un agent ; « Charge » montre par agent les jobs en cours, les echecs,
+    les messages non lus, la disponibilite, la memoire libre et les reaffectations
+    proposees. Des permissions par equipe existent (creer un agent, approuver un job,
+    lancer les tests) et sont verifiees cote serveur quand un agent est designe.
+16. Application (P7) :
+    - lancement sans console : BM318d-Controleur.pyw demarre le serveur si besoin,
+      attend qu'il reponde, ouvre le navigateur ; un second lancement n'en cree pas un autre.
+    - arret propre : ARRETER-BM318d.cmd (ou python BM318d-Stop.py) lit le jeton de la
+      page et demande l'arret ; aucun mot de passe stocke.
+    - « Reglages » : adresse Ollama, modele par defaut, jobs simultanes, intervalle de
+      sauvegarde automatique (0 = arretee), dossier des workspaces (lecture seule).
+    - « Sauvegardes » : liste, sauvegarde immediate, restauration (une sauvegarde de
+      securite est faite avant, et seuls les fichiers de backups\ sont acceptes).
+    - « Rechercher » dans la barre : agents, missions, jobs, notes, decisions, messages.
+    - Le bouton ● compte les messages non lus, recrutements en attente, jobs en echec
+      et passations a acquitter.
+    - installer\BM318d-Setup.ps1 installe dans %LOCALAPPDATA%\BM318d avec raccourci
+      bureau, lanceur, arret et desinstallateur (-NoShortcuts pour un test).
+    - BM318d-Fenetre.pyw : petite fenetre de controle (en ligne / hors ligne,
+      Ouvrir, Sauvegarder, Arreter), sans terminal.
+    - Mise a jour controlee : /api/mc/version, /api/mc/update/check (compare a
+      installer\version.json) et installer\BM318d-Update.ps1 (copie apres sauvegarde
+      de l'installation actuelle ; rien n'est telecharge automatiquement).
+17. Branches et competences (P2/P6) :
+    - « + Branche » cree une branche avec son architecte ; plusieurs architectes
+      peuvent gerer des branches differentes. Un job peut etre rattache a une branche
+      (refus si la branche est inconnue ou d'un autre projet).
+    - Chaque agent peut declarer des competences (python, sqlite...). L'affectation
+      automatique choisit d'abord les competences demandees, puis la charge la plus
+      faible.
+    - La limite d'executions simultanees tient compte de la RAM libre, du CPU mesure
+      (GetSystemTimes) et, si nvidia-smi existe, de l'utilisation GPU. Quand une mesure
+      est indisponible, elle est ignoree, jamais inventee.
+
+IMPORTANT : cette version organise et supervise les assistants mais ne lance PAS encore plusieurs agents autonomes. L'onglet Ollama existant reste une aide de lecture seule. Le transfert de contexte produit un dossier de passation consultable, pas un message automatiquement envoye a un modele. Les permissions de fichiers et l'execution de code ne sont pas activees.
+
+SECURITE (ajoute le 18/10) :
+- Le serveur genere un jeton de session a chaque demarrage, l'injecte dans la page
+  et le pose en cookie HttpOnly + SameSite=Strict. Toute route /api le reclame.
+- Les requetes venant d'une autre origine et les corps non JSON sont refuses.
+- Limite de debit : 60 requetes POST par minute (MC_RATE_LIMIT pour la changer).
+- Cela protege des pages web tierces et des requetes aveugles ; cela ne protege pas
+  d'un programme local lance par le meme utilisateur. Le serveur reste sur 127.0.0.1.
+
+Base partagee : bm318d.sqlite3
+Sauvegarde : dossier backups\  (python MissionControl.py --sauvegarde)
+Tests : python test_mission_control.py   (logique)
+        python test_http.py              (integration HTTP, base temporaire)
+        python test_restore.py           (sauvegarde et restauration)
+        python test_jobs.py              (moteur de jobs, modele simule)
+        python test_plan.py              (planification, dependances, orchestration)
+        python test_memory.py            (memoire, decisions, messages, passations)
+        python test_review.py            (revue, audit securite, validation, git, rapport)
+        python test_teams.py             (roles, duplication, recrutement, permissions, charge)
+        python test_app.py               (reglages, recherche, sauvegardes, restauration, arret, installateur, mise a jour, fenetre)
+        python test_branches.py          (branches par architecte, competences, CPU/GPU, limite)
+        python test_agent_reel.py        (Ollama reel, lent, depend d'Ollama)
+        python test_plan_reel.py         (decomposition reelle par le modele)
+        node test_ui.mjs                 (interface dans un vrai Chrome, base temporaire)
+          MC_UI_URL=http://127.0.0.1:31880/ node test_ui.mjs  -> lecture seule du serveur reel
+Serveur local seulement : 127.0.0.1:31880

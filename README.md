@@ -1,0 +1,27 @@
+# BM318D — Control Center
+
+BM318D is a local-first Windows control center for organizing projects, AI agents, missions, assignments, and their evidence. The repository contains the Python desktop/server application, the Mission Control web interface, AI-provider and MCP connector code, security/sandbox modules, installer scripts, and automated tests.
+
+## Project at a glance
+
+- **Desktop and local service:** Python/Tkinter entry points and a local Mission Control HTTP service.
+- **Mission Control UI:** project agents and teams, missions and assignments, a visual canvas, context and handoffs, jobs, plans, reviews, and evidence.
+- **AI support:** local Ollama and compatible provider integrations, per-agent assignments, quotas/fallback behavior, and connector management.
+- **Security work:** route authorization, isolated workspaces, sandbox backends, permission checks, and tests.
+
+This repository is a reviewed source snapshot, not a deployment package. Local databases, credentials, backups, logs, and personal handoff notes are intentionally excluded. Do not add them to Git.
+
+## Start here
+
+1. Read this file and [`docs/SECURITY-STATUS.md`](docs/SECURITY-STATUS.md).
+2. Read [`MISSION-CONTROL-LISEZMOI.txt`](MISSION-CONTROL-LISEZMOI.txt) for the product flows described by the project.
+3. Read [`GROK-MISSION-01-PRODUCT-AUDIT.md`](GROK-MISSION-01-PRODUCT-AUDIT.md) for the initial read-only design and interaction review.
+4. The principal UI files are `BM318d-Railway.html`, `mission.js`, `mission.css`, and `connectors.js`; server behavior is implemented mainly in `MissionControl.py`, `BM318d-WebServer.py`, `mc_agent.py`, and `mc_connectors.py`.
+
+## Local development
+
+Use a disposable copy and temporary databases for tests. Review the command and environment before running scripts; do not point tests at a real user database or a live service. The individual test files document their fixtures and can be run with Python or Node where applicable.
+
+## Collaboration
+
+For Grok’s first task, connect only this repository and use the read-only review prompt in `GROK-MISSION-01-PRODUCT-AUDIT.md`. Ask for proposed changes as findings; do not authorize commits or edits during the discovery review.
