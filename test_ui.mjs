@@ -164,7 +164,7 @@ try {
   t('le raccourci de l’accueil ouvre le vrai formulaire de tâche', await c.evaluate(`document.getElementById('modalback').classList.contains('open')`));
   await c.evaluate(`document.getElementById('cancel').click()`);
   await c.evaluate(`document.querySelector('.workspace-link[data-workspace-page="tasks"]').click()`); await sleep(100);
-  t('la navigation du panneau ouvre les tâches existantes', await c.evaluate(`document.getElementById('tasks').classList.contains('active')`));
+  t('la navigation ouvre les tâches et expose le choix actif aux lecteurs d’écran', await c.evaluate(`document.getElementById('tasks').classList.contains('active') && document.querySelector('.workspace-link[data-workspace-page="tasks"]').getAttribute('aria-current')==='page'`));
   await c.evaluate(`document.querySelector('.workspace-link[data-workspace-page="canvas"]').click()`); await sleep(100);
   const largeurAvant=await c.evaluate(`Number(document.getElementById('workspaceGrip').getAttribute('aria-valuenow'))`);
   await c.evaluate(`document.getElementById('workspaceGrip').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}))`);

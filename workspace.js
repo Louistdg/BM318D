@@ -74,7 +74,7 @@
   grip.addEventListener('pointerup',()=>{if(resizing){resizing=false;widthApply(width,true)}});
   grip.addEventListener('pointercancel',()=>{resizing=false});
   grip.addEventListener('keydown',e=>{const delta=e.key==='ArrowRight'?16:e.key==='ArrowLeft'?-16:0;if(delta||e.key==='Home'||e.key==='End'){e.preventDefault();widthApply(e.key==='Home'?175:e.key==='End'?410:width+delta,true)}});
-  function activePage(p){side.querySelectorAll('[data-workspace-page]').forEach(b=>b.classList.toggle('active',b.dataset.workspacePage===p));}
+  function activePage(p){side.querySelectorAll('[data-workspace-page]').forEach(b=>{const active=b.dataset.workspacePage===p;b.classList.toggle('active',active);if(active)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});}
   side.querySelectorAll('[data-workspace-page]').forEach(b=>b.onclick=()=>{
     const target=b.dataset.workspacePage;
     if(target==='connectors'){const launch=document.querySelector('.cx-launcher');if(launch){launch.click();return;}const mc=rail.querySelector('[data-page="mission"]');if(mc)mc.click();setTimeout(()=>document.getElementById('mcConnecteurs')?.click(),0);return;}
