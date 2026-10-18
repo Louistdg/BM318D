@@ -167,3 +167,28 @@ body:has(#mission.active)>.cx-launcher{display:none}
  .subhead button{padding:7px 8px}
  .hint{display:none}
 }
+/* Match the standalone Railway-style preview more closely. */
+.app{font:14px Inter,"Segoe UI",sans-serif}
+.rail{width:62px!important;min-width:62px;padding:14px 8px;gap:8px}
+.rail .logo{width:39px;height:39px;font-size:20px;margin:0 0 17px}
+.rail button[data-page],.rail #reset{width:42px;min-width:42px;height:42px;min-height:42px;font-size:18px}
+.workspace-sidebar{width:245px;max-width:410px;padding:15px 12px}
+.workspace-project{border-radius:10px}
+.workspace-link{font-size:12.5px}
+.workspace-icon{font-size:15px}
+.workspace-grip{right:-3px;width:6px}
+.empty{pointer-events:auto;padding:24px}
+.canvas-welcome{width:min(690px,100%);padding:34px 36px 25px;text-align:left;border:1px solid #302d3a;border-radius:16px;background:linear-gradient(145deg,#191821,#15141c);box-shadow:0 22px 60px #0005}
+.canvas-eyebrow{color:#b8a1e9;font-size:10px;font-weight:700;letter-spacing:.14em}
+.canvas-welcome h2{margin:12px 0 8px;color:#f0eef5;font-size:25px;line-height:1.2;font-weight:650}
+.canvas-welcome>p{max-width:520px;margin:0;color:#9692a3;font-size:13px;line-height:1.65}
+.canvas-welcome-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:20px}
+.canvas-welcome-actions button{font-size:12px;padding:9px 12px}
+.canvas-welcome-actions button.primary{background:#aa8de8;border-color:#aa8de8}
+.canvas-welcome-features{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:26px}
+.canvas-welcome-features>div{display:grid;grid-template-columns:25px 1fr;align-items:center;column-gap:7px;padding:12px 11px;border:1px solid #302d3a;border-radius:10px;background:#14131a}
+.canvas-welcome-features span{grid-row:span 2;color:#b8a1e9;font-size:10px;font-weight:700}
+.canvas-welcome-features b{font-size:12px;font-weight:600;color:#e5e1eb}
+.canvas-welcome-features small{margin-top:4px;color:#9692a3;font-size:10px;line-height:1.4}
+.canvas-welcome-foot{display:block;margin-top:18px;color:#777384;font-size:10px}
+@media(max-width:760px){.rail{width:62px!important;min-width:62px}.workspace-sidebar{padding:15px 12px}.empty{padding:14px}.canvas-welcome{padding:23px 19px 18px}.canvas-welcome h2{font-size:21px}.canvas-welcome-features{grid-template-columns:1fr;margin-top:18px}.canvas-welcome-features>div{grid-template-columns:25px 1fr}.canvas-welcome-foot{line-height:1.5}}

@@ -152,6 +152,13 @@ try {
   t('la barre laterale a le bouton Mission Control', await c.evaluate(`!!document.querySelector('.rail button[data-page="mission"]')`));
   t('la nouvelle navigation affiche le panneau projet et le rail compact', await c.evaluate(`!!document.querySelector('.workspace-sidebar') && !!document.querySelector('.workspace-grip') && document.querySelector('.rail').getBoundingClientRect().width < 80`));
   t('le canevas historique est l’accueil sans bouton Ancien tableau', await c.evaluate(`document.getElementById('canvas').classList.contains('active') && !document.getElementById('ancienTableau')`));
+  t('le canevas vide propose un accueil utile dans le style de la maquette', await c.evaluate(`!!document.querySelector('.canvas-welcome') && document.querySelectorAll('.canvas-welcome-features>div').length===3`));
+  await c.evaluate(`document.getElementById('emptyOverview').click()`); await sleep(100);
+  t('le raccourci de l’accueil ouvre la vraie vue d’ensemble', await c.evaluate(`document.getElementById('overview').classList.contains('active')`));
+  await c.evaluate(`document.querySelector('.workspace-link[data-workspace-page="canvas"]').click()`); await sleep(100);
+  await c.evaluate(`document.getElementById('emptyNewTask').click()`); await sleep(80);
+  t('le raccourci de l’accueil ouvre le vrai formulaire de tâche', await c.evaluate(`document.getElementById('modalback').classList.contains('open')`));
+  await c.evaluate(`document.getElementById('cancel').click()`);
   await c.evaluate(`document.querySelector('.workspace-link[data-workspace-page="tasks"]').click()`); await sleep(100);
   t('la navigation du panneau ouvre les tâches existantes', await c.evaluate(`document.getElementById('tasks').classList.contains('active')`));
   await c.evaluate(`document.querySelector('.workspace-link[data-workspace-page="canvas"]').click()`); await sleep(100);

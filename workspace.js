@@ -7,15 +7,18 @@
  const token = (document.querySelector('meta[name="mc-token"]') || {}).content || '';
  const widthKey = 'bm318d.sidebar.width.v2', collapsedKey = 'bm318d.sidebar.collapsed.v2';
  const mobile = () => matchMedia('(max-width:760px)').matches;
- const clamp = value => Math.max(180, Math.min(380, Math.round(Number(value) || 248)));
- let width = clamp(localStorage.getItem(widthKey) || 248);
+ const clamp = value => Math.max(175, Math.min(410, Math.round(Number(value) || 245)));
+ let width = clamp(localStorage.getItem(widthKey) || 245);
  let collapsed = localStorage.getItem(collapsedKey) === 'true';
  const labels = {canvas:'Canevas',overview:"Vue d’ensemble",tasks:'Tâches',agents:'Agent IA local',events:'Journal',documents:'Dossiers & fiches',mission:'Mission Control'};
  const symbols = {canvas:'◇',overview:'▦',tasks:'☷',agents:'◈',events:'▤',documents:'▣',mission:'◎'};
   const side=document.createElement('aside');side.id='workspaceSidebar';side.className='workspace-sidebar';
   const groups=[['ESPACE DE TRAVAIL',['canvas','overview','tasks','agents','documents','events']],['ORGANISATION',['mission','connectors']]];
-  side.innerHTML='<div class="workspace-sidehead"><span>ESPACE PROJET</span><button id="workspaceCollapse" type="button" aria-label="Réduire le panneau">‹</button></div><div class="workspace-project"><strong>✦ <span id="workspaceProjectName">Projet</span></strong><small>Projet local</small></div>'+groups.map(([title,items])=>'<div class="workspace-label">'+title+'</div>'+items.map(key=>'<button type="button" class="workspace-link" data-workspace-page="'+key+'"><span class="workspace-icon">'+(symbols[key]||'⌘')+'</span><span>'+safe(labels[key]||(key==='connectors'?'Connecteurs IA':''))+'</span></button>').join('')).join('')+'<div class="workspace-foot">LOCAL · SQLite<br><small>Les données restent sur cet appareil.</small></div><div id="workspaceGrip" class="workspace-grip" role="separator" tabindex="0" aria-label="Ajuster la largeur du panneau" aria-orientation="vertical" aria-valuemin="180" aria-valuemax="380"></div>';
+  side.innerHTML='<div class="workspace-sidehead"><span>ESPACE PROJET</span><button id="workspaceCollapse" type="button" aria-label="Réduire le panneau">‹</button></div><div class="workspace-project"><strong>✦ <span id="workspaceProjectName">Projet</span></strong><small>Projet local</small></div>'+groups.map(([title,items])=>'<div class="workspace-label">'+title+'</div>'+items.map(key=>'<button type="button" class="workspace-link" data-workspace-page="'+key+'"><span class="workspace-icon">'+(symbols[key]||'⌘')+'</span><span>'+safe(labels[key]||(key==='connectors'?'Connecteurs IA':''))+'</span></button>').join('')).join('')+'<div class="workspace-foot">LOCAL · SQLite<br><small>Les données restent sur cet appareil.</small></div><div id="workspaceGrip" class="workspace-grip" role="separator" tabindex="0" aria-label="Ajuster la largeur du panneau" aria-orientation="vertical" aria-valuemin="175" aria-valuemax="410"></div>';
   rail.after(side);
+  const emptyNewTask=document.getElementById('emptyNewTask'),emptyOverview=document.getElementById('emptyOverview');
+  if(emptyNewTask)emptyNewTask.onclick=()=>document.getElementById('newTask')?.click();
+  if(emptyOverview)emptyOverview.onclick=()=>rail.querySelector('[data-page="overview"]')?.click();
   const header=document.querySelector('.header');
   const toggle=document.createElement('button');toggle.type='button';toggle.id='sidebarToggle';toggle.className='workspace-toggle';toggle.textContent='☰';toggle.setAttribute('aria-label','Replier la navigation');
   const crumb=header&&header.querySelector('.crumb');if(crumb)header.insertBefore(toggle,crumb);
@@ -59,7 +62,7 @@
   grip.addEventListener('pointermove',e=>{if(resizing)widthApply(e.clientX-side.getBoundingClientRect().left)});
   grip.addEventListener('pointerup',()=>{if(resizing){resizing=false;widthApply(width,true)}});
   grip.addEventListener('pointercancel',()=>{resizing=false});
-  grip.addEventListener('keydown',e=>{const delta=e.key==='ArrowRight'?16:e.key==='ArrowLeft'?-16:0;if(delta||e.key==='Home'||e.key==='End'){e.preventDefault();widthApply(e.key==='Home'?180:e.key==='End'?380:width+delta,true)}});
+  grip.addEventListener('keydown',e=>{const delta=e.key==='ArrowRight'?16:e.key==='ArrowLeft'?-16:0;if(delta||e.key==='Home'||e.key==='End'){e.preventDefault();widthApply(e.key==='Home'?175:e.key==='End'?410:width+delta,true)}});
   function activePage(p){side.querySelectorAll('[data-workspace-page]').forEach(b=>b.classList.toggle('active',b.dataset.workspacePage===p));}
   side.querySelectorAll('[data-workspace-page]').forEach(b=>b.onclick=()=>{
     const target=b.dataset.workspacePage;
