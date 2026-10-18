@@ -22,7 +22,7 @@ class SandboxV23(unittest.TestCase):
     def test_01_outside_read_and_windows_mounts_denied(self):
         self.assertTrue(self.outside.is_file())
         code=f'''import json,pathlib
-paths=[{linux_path(self.outside)!r},'/mnt/c','/mnt/d',{str(pathlib.Path.home())!r},'/run','/etc/passwd','/proc/1/root/mnt/c','/proc/self/root/mnt/d']
+paths=[{linux_path(self.outside)!r},'/mnt/c','/mnt/d',{str(Path.home())!r},'/run','/etc/passwd','/proc/1/root/mnt/c','/proc/self/root/mnt/d']
 results=[]
 for path in paths:
  try:

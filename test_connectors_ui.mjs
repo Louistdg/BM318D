@@ -150,6 +150,10 @@ try {
   t('aucune erreur JavaScript au chargement', c.erreurs().length === 0, c.erreurs());
   t('la barre laterale a le bouton Mission Control', await c.evaluate(`!!document.querySelector('.rail button[data-page="mission"]')`));
   t('la page contient un jeton de session', await c.evaluate(`(document.querySelector('meta[name="mc-token"]')||{}).content||''`).then(v => (v || '').length > 20));
+  if (!LECTURE_SEULE) {
+    const admin = fs.readFileSync(path.join(path.dirname(base), 'logs', 'admin-token.txt'), 'utf8').trim();
+    await c.evaluate(`window.mcJetonAdmin=${JSON.stringify(admin)}`);
+  }
 
   const lireEtat = async () => JSON.parse(await c.evaluate(`(async () => JSON.stringify(await (await fetch('/api/mc/state?project='+Number(document.getElementById('project').value),{headers:{'X-MC-Token':(document.querySelector('meta[name="mc-token"]')||{}).content}})).json()))()`));
   console.log('\n=== connecteurs V2.2 ===');
@@ -188,7 +192,7 @@ try {
   const restantes = c.erreurs().filter(x => !/status of 400/i.test(x));
   t('aucune erreur JS hors refus attendu', restantes.length === 0, restantes);
 } finally {
-  if (c) { try { await c.send('Browser.close'); } catch {} }
+  if (c) { try { await Promise.race([c.send('Browser.close'), sleep(2000)]); } catch {} }
   chrome.kill();
   if (serveur) serveur.kill();
   await sleep(500);

@@ -206,7 +206,7 @@ try {
   t('la panne affiche un message lisible', await c.evaluate(`[...document.querySelectorAll('#chatlog .msg')].pop().textContent.includes('Ollama ne repond pas')`));
   t('aucune erreur JavaScript non geree', c.erreurs().length === 0, c.erreurs());
 } finally {
-  if (c) { try { await c.send('Browser.close'); } catch {} }
+  if (c) { try { await Promise.race([c.send('Browser.close'), sleep(2000)]); } catch {} }
   chrome.kill();
   serveur.kill();
   await sleep(500);

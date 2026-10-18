@@ -167,7 +167,7 @@ try {
   t('script de garde separe present',await c.evaluate(`!!document.querySelector('script[src="/security-ui.js"]')`));
   t('aucune erreur JavaScript non geree',c.erreurs().length===0,c.erreurs());
 } finally {
-  if (c) { try { await c.send('Browser.close'); } catch {} }
+  if (c) { try { await Promise.race([c.send('Browser.close'), sleep(2000)]); } catch {} }
   chrome.kill();
   if (serveur) serveur.kill();
   await sleep(500);
