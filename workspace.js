@@ -5,43 +5,40 @@
  const rail = document.querySelector('.rail');
  const main = document.querySelector('.main');
  const token = (document.querySelector('meta[name="mc-token"]') || {}).content || '';
- const widthKey = 'bm318d.sidebar.width.v1', collapsedKey = 'bm318d.sidebar.collapsed.v1';
+ const widthKey = 'bm318d.sidebar.width.v2', collapsedKey = 'bm318d.sidebar.collapsed.v2';
  const mobile = () => matchMedia('(max-width:760px)').matches;
- const clamp = value => Math.max(168, Math.min(330, Math.round(Number(value) || 216)));
- let width = clamp(localStorage.getItem(widthKey) || 216);
+ const clamp = value => Math.max(180, Math.min(380, Math.round(Number(value) || 248)));
+ let width = clamp(localStorage.getItem(widthKey) || 248);
  let collapsed = localStorage.getItem(collapsedKey) === 'true';
  const labels = {canvas:'Canevas',overview:"Vue d’ensemble",tasks:'Tâches',agents:'Agent IA local',events:'Journal',documents:'Dossiers & fiches',mission:'Mission Control'};
  const symbols = {canvas:'◇',overview:'▦',tasks:'☷',agents:'◈',events:'▤',documents:'▣',mission:'◎'};
- function widthApply(value, remember = false) {
-   width = clamp(value);
-   rail.style.setProperty('--sidebar-width',width + 'px');
-   const grip = document.getElementById('sidebarGrip');
-   if (grip) grip.setAttribute('aria-valuenow',String(width));
-   if (remember) localStorage.setItem(widthKey,String(width));
- }
+  const side=document.createElement('aside');side.id='workspaceSidebar';side.className='workspace-sidebar';
+  const groups=[['ESPACE DE TRAVAIL',['canvas','overview','tasks','agents','documents','events']],['ORGANISATION',['mission','connectors']]];
+  side.innerHTML='<div class="workspace-sidehead"><span>ESPACE PROJET</span><button id="workspaceCollapse" type="button" aria-label="Réduire le panneau">‹</button></div><div class="workspace-project"><strong>✦ <span id="workspaceProjectName">Projet</span></strong><small>Projet local</small></div>'+groups.map(([title,items])=>'<div class="workspace-label">'+title+'</div>'+items.map(key=>'<button type="button" class="workspace-link" data-workspace-page="'+key+'"><span class="workspace-icon">'+(symbols[key]||'⌘')+'</span><span>'+safe(labels[key]||(key==='connectors'?'Connecteurs IA':''))+'</span></button>').join('')).join('')+'<div class="workspace-foot">LOCAL · SQLite<br><small>Les données restent sur cet appareil.</small></div><div id="workspaceGrip" class="workspace-grip" role="separator" tabindex="0" aria-label="Ajuster la largeur du panneau" aria-orientation="vertical" aria-valuemin="180" aria-valuemax="380"></div>';
+  rail.after(side);
+  const header=document.querySelector('.header');
+  const toggle=document.createElement('button');toggle.type='button';toggle.id='sidebarToggle';toggle.className='workspace-toggle';toggle.textContent='☰';toggle.setAttribute('aria-label','Replier la navigation');
+  const crumb=header&&header.querySelector('.crumb');if(crumb)header.insertBefore(toggle,crumb);
+  function widthApply(value, remember = false) {
+    width=clamp(value);side.style.width=width+'px';side.style.setProperty('--sidebar-width',width+'px');
+    const grip=document.getElementById('workspaceGrip');if(grip)grip.setAttribute('aria-valuenow',String(width));
+    if(remember)localStorage.setItem(widthKey,String(width));
+  }
  function collapsedApply(value) {
    collapsed = Boolean(value);
    document.body.classList.toggle('sidebar-collapsed', collapsed);
-   const toggle = document.getElementById('sidebarToggle');
-   if (toggle) {
-     toggle.setAttribute('aria-expanded',String(!collapsed));
-     toggle.setAttribute('aria-label',collapsed?'Déplier la navigation':'Replier la navigation');
-     toggle.title = collapsed?'Déplier la navigation':'Replier la navigation';
-   }
+    toggle.setAttribute('aria-expanded',String(!collapsed));
+    toggle.setAttribute('aria-label',collapsed?'Déplier la navigation':'Replier la navigation');
+    toggle.title=collapsed?'Déplier la navigation':'Replier la navigation';
    localStorage.setItem(collapsedKey,String(collapsed));
  }
- const brand = document.createElement('span');
- brand.className='nav-brand';brand.textContent='BM318d';
- rail.querySelector('.logo').append(brand);
- const toggle=document.createElement('button');
- toggle.type='button';toggle.id='sidebarToggle';toggle.className='sidebar-toggle';
- toggle.textContent='☰';toggle.onclick=()=>{
-   if (mobile()) {
-     document.body.classList.toggle('sidebar-mobile-open');
-     toggle.setAttribute('aria-expanded',String(document.body.classList.contains('sidebar-mobile-open')));
-   } else collapsedApply(!collapsed);
- };
- rail.querySelector('.logo').after(toggle);
+  toggle.onclick=()=>{
+    if (mobile()) {
+      document.body.classList.toggle('sidebar-mobile-open');
+      toggle.setAttribute('aria-expanded',String(document.body.classList.contains('sidebar-mobile-open')));
+    } else collapsedApply(!collapsed);
+  };
+  document.getElementById('workspaceCollapse').onclick=()=>collapsedApply(true);
  const docButton=document.createElement('button');
  docButton.type='button';docButton.dataset.page='documents';docButton.title='Dossiers et fiches du projet';
  const missionButton=rail.querySelector('[data-page="mission"]');
@@ -49,28 +46,31 @@
  rail.insertBefore(missionButton,rail.querySelector('#reset'));
  for (const b of rail.querySelectorAll('button[data-page]')) {
    const p=b.dataset.page;
-   b.innerHTML='<span class="nav-icon" aria-hidden="true">'+symbols[p]+'</span><span class="nav-label">'+safe(labels[p])+'</span>';
+    b.innerHTML='<span class="nav-icon" aria-hidden="true">'+symbols[p]+'</span>';
    b.setAttribute('aria-label',labels[p]);
    b.title=labels[p];
  }
  const reset=rail.querySelector('#reset');
- if (reset) {reset.setAttribute('aria-label','Recentrer le canevas');reset.innerHTML='<span class="nav-icon" aria-hidden="true">⌖</span><span class="nav-label">Recentrer</span>';}
- const grip=document.createElement('div');
- grip.id='sidebarGrip';grip.className='sidebar-grip';grip.tabIndex=0;grip.setAttribute('role','separator');
- grip.setAttribute('aria-label','Ajuster la largeur de la navigation');
- grip.setAttribute('aria-orientation','vertical');grip.setAttribute('aria-valuemin','168');grip.setAttribute('aria-valuemax','330');
- rail.append(grip);
+  if (reset) {reset.setAttribute('aria-label','Recentrer le canevas');reset.innerHTML='<span class="nav-icon" aria-hidden="true">⌖</span>';}
  widthApply(width);collapsedApply(collapsed);
  if(mobile())toggle.setAttribute('aria-expanded','false');
- let resizing=false;
- grip.addEventListener('pointerdown',e=>{if(mobile()||collapsed||e.button!==0)return;resizing=true;grip.setPointerCapture(e.pointerId);e.preventDefault()});
- grip.addEventListener('pointermove',e=>{if(resizing)widthApply(e.clientX-rail.getBoundingClientRect().left)});
- grip.addEventListener('pointerup',()=>{if(resizing){resizing=false;widthApply(width,true)}});
- grip.addEventListener('pointercancel',()=>{resizing=false});
- grip.addEventListener('keydown',e=>{
-   const delta=e.key==='ArrowRight'?16:e.key==='ArrowLeft'?-16:0;
-   if (delta || e.key==='Home' || e.key==='End') {e.preventDefault();widthApply(e.key==='Home'?168:e.key==='End'?330:width+delta,true)}
- });
+  let resizing=false;const grip=document.getElementById('workspaceGrip');
+  grip.addEventListener('pointerdown',e=>{if(mobile()||collapsed||e.button!==0)return;resizing=true;grip.setPointerCapture(e.pointerId);e.preventDefault()});
+  grip.addEventListener('pointermove',e=>{if(resizing)widthApply(e.clientX-side.getBoundingClientRect().left)});
+  grip.addEventListener('pointerup',()=>{if(resizing){resizing=false;widthApply(width,true)}});
+  grip.addEventListener('pointercancel',()=>{resizing=false});
+  grip.addEventListener('keydown',e=>{const delta=e.key==='ArrowRight'?16:e.key==='ArrowLeft'?-16:0;if(delta||e.key==='Home'||e.key==='End'){e.preventDefault();widthApply(e.key==='Home'?180:e.key==='End'?380:width+delta,true)}});
+  function activePage(p){side.querySelectorAll('[data-workspace-page]').forEach(b=>b.classList.toggle('active',b.dataset.workspacePage===p));}
+  side.querySelectorAll('[data-workspace-page]').forEach(b=>b.onclick=()=>{
+    const target=b.dataset.workspacePage;
+    if(target==='connectors'){const launch=document.querySelector('.cx-launcher');if(launch){launch.click();return;}const mc=rail.querySelector('[data-page="mission"]');if(mc)mc.click();setTimeout(()=>document.getElementById('mcConnecteurs')?.click(),0);return;}
+    const button=rail.querySelector('[data-page="'+target+'"]');if(button)button.click();
+  });
+  const projectLabel=document.getElementById('workspaceProjectName'),wsProjectSelect=document.getElementById('project');
+  if(wsProjectSelect){const updateProject=()=>{const option=wsProjectSelect.options[wsProjectSelect.selectedIndex];projectLabel.textContent=option?option.textContent:'Projet';};wsProjectSelect.addEventListener('change',updateProject);new MutationObserver(updateProject).observe(wsProjectSelect,{childList:true});updateProject();}
+  const syncNav=()=>{const current=rail.querySelector('button[data-page].active');if(current)activePage(current.dataset.page);};
+  new MutationObserver(syncNav).observe(rail,{subtree:true,attributes:true,attributeFilter:['class']});
+  syncNav();
  rail.addEventListener('click',e=>{
    const b=e.target.closest('button[data-page]');if(!b)return;
    if (b.dataset.page!=='mission') {
@@ -78,8 +78,9 @@
      if (b.dataset.page==='overview') refreshOverview();
      if (b.dataset.page==='documents') {showDocuments();refreshDocuments();}
    }
-   if (mobile())document.body.classList.remove('sidebar-mobile-open');
+   if (mobile()){document.body.classList.remove('sidebar-mobile-open');toggle.setAttribute('aria-expanded','false');}
  });
+  document.addEventListener('click',e=>{if(mobile()&&document.body.classList.contains('sidebar-mobile-open')&&!e.target.closest('.workspace-sidebar')&&!e.target.closest('#sidebarToggle')){document.body.classList.remove('sidebar-mobile-open');toggle.setAttribute('aria-expanded','false');}});
  docButton.onclick=()=>showDocuments();
  const before= document.getElementById('ancienTableau');
  if(before)before.textContent='Canevas';

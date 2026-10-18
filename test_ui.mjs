@@ -150,6 +150,18 @@ try {
   t('la vue d’ensemble ne fabrique pas d’agents', await c.evaluate(`!/IA 1|Architecture|Développement|Audit/.test(document.getElementById('agentCards').textContent)`));
   await c.evaluate(`document.querySelector('.legacy-nav[data-page=\"canvas\"]').click()`);
   t('la barre laterale a le bouton Mission Control', await c.evaluate(`!!document.querySelector('.rail button[data-page="mission"]')`));
+  t('la nouvelle navigation affiche le panneau projet et le rail compact', await c.evaluate(`!!document.querySelector('.workspace-sidebar') && !!document.querySelector('.workspace-grip') && document.querySelector('.rail').getBoundingClientRect().width < 80`));
+  t('le canevas historique est l’accueil sans bouton Ancien tableau', await c.evaluate(`document.getElementById('canvas').classList.contains('active') && !document.getElementById('ancienTableau')`));
+  await c.evaluate(`document.querySelector('.workspace-link[data-workspace-page="tasks"]').click()`); await sleep(100);
+  t('la navigation du panneau ouvre les tâches existantes', await c.evaluate(`document.getElementById('tasks').classList.contains('active')`));
+  await c.evaluate(`document.querySelector('.workspace-link[data-workspace-page="canvas"]').click()`); await sleep(100);
+  const largeurAvant=await c.evaluate(`Number(document.getElementById('workspaceGrip').getAttribute('aria-valuenow'))`);
+  await c.evaluate(`document.getElementById('workspaceGrip').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}))`);
+  t('la largeur du panneau projet est ajustable au clavier', await c.evaluate(`Number(document.getElementById('workspaceGrip').getAttribute('aria-valuenow'))===${largeurAvant+16}`));
+  await c.evaluate(`document.getElementById('sidebarToggle').click()`);
+  t('le panneau projet peut être réduit', await c.evaluate(`document.body.classList.contains('sidebar-collapsed')`));
+  await c.evaluate(`document.getElementById('sidebarToggle').click()`);
+  t('le panneau projet peut être rouvert', await c.evaluate(`!document.body.classList.contains('sidebar-collapsed')`));
   t('la page contient un jeton de session', await c.evaluate(`(document.querySelector('meta[name="mc-token"]')||{}).content||''`).then(v => (v || '').length > 20));
 
   const lireEtat = async () => JSON.parse(await c.evaluate(`(async () => JSON.stringify(await (await fetch('/api/mc/state?project='+Number(document.getElementById('project').value),{headers:{'X-MC-Token':(document.querySelector('meta[name="mc-token"]')||{}).content}})).json()))()`));
@@ -554,6 +566,13 @@ try {
   } else {
     console.log('  (un seul projet dans la base isolee : changement non testable)');
   }
+
+  console.log('\n=== navigation mobile ===');
+  await c.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+  await c.evaluate(`document.getElementById('sidebarToggle').click()`); await sleep(220);
+  t('le panneau projet s’ouvre depuis le bouton de navigation mobile', await c.evaluate(`document.body.classList.contains('sidebar-mobile-open')`));
+  await c.evaluate(`document.querySelector('.workspace-link[data-workspace-page="overview"]').click()`); await sleep(120);
+  t('la navigation mobile ouvre la vue demandée et replie le panneau', await c.evaluate(`document.getElementById('overview').classList.contains('active') && !document.body.classList.contains('sidebar-mobile-open')`));
 
   console.log('\n=== fin ===');
   t('aucune erreur JavaScript a la fin', c.erreurs().length === 0, c.erreurs());
