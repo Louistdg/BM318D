@@ -152,6 +152,7 @@ try {
   t('la vue d’ensemble ne fabrique pas d’agents', await c.evaluate(`!/IA 1|Architecture|Développement|Audit/.test(document.getElementById('agentCards').textContent)`));
   await c.evaluate(`document.querySelector('.legacy-nav[data-page=\"canvas\"]').click()`);
   t('la barre laterale a le bouton Mission Control', await c.evaluate(`!!document.querySelector('.rail button[data-page="mission"]')`));
+  t('le logo BM318d affiche son monogramme vectoriel accessible', await c.evaluate(`document.querySelector('.rail .logo[aria-label="Logo BM318d"] .brand-mark path')!==null`));
   t('la nouvelle navigation affiche le panneau projet et le rail compact', await c.evaluate(`!!document.querySelector('.workspace-sidebar') && !!document.querySelector('.workspace-grip') && document.querySelector('.rail').getBoundingClientRect().width < 80`));
   t('le canevas historique est l’accueil sans bouton Ancien tableau', await c.evaluate(`document.getElementById('canvas').classList.contains('active') && !document.getElementById('ancienTableau')`));
   t('le canevas vide propose un accueil utile dans le style de la maquette', await c.evaluate(`!!document.querySelector('.canvas-welcome') && document.querySelectorAll('.canvas-welcome-features>div').length===3`));

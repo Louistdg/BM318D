@@ -250,3 +250,7 @@ input:focus,textarea:focus,select:focus{border-color:#82cfff;box-shadow:0 0 0 3p
 .canvas-welcome-foot{margin-top:20px}
 .empty{background:radial-gradient(ellipse at 50% 45%,#10233722,transparent 60%)}
 @media(max-width:760px){.canvas-welcome{padding:25px 20px 20px}.canvas-welcome h2{font-size:23px}}
+.rail .logo{border:1px solid #b4e9ff66;border-radius:14px;overflow:visible}
+.brand-mark{display:block;width:25px;height:25px;overflow:visible}
+.brand-mark path{fill:none;stroke:#10273a;stroke-width:2.7;stroke-linecap:round;stroke-linejoin:round}
+.brand-mark circle{fill:#f1fbff;stroke:#10273a;stroke-width:1.5}
