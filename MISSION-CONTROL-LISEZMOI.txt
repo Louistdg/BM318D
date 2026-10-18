@@ -3,7 +3,7 @@ BM318d MISSION CONTROL - VERSION EXPERIMENTALE
 Lancement : double-cliquer sur LANCER-MISSION-CONTROL.cmd
 Adresse locale : http://127.0.0.1:31880/
 
-Dans la barre latérale, cliquer sur l'icone ♜ (Mission Control).
+Au lancement, Mission Control est l'écran principal. L'ancien canvas, les tâches et le journal restent sous le bouton « Ancien tableau ».
 
 1. + Agent : creer des assistants de roles differents, choisir equipe et responsable.
 2. Deplacer les cartes sur le canvas : positions persistantes dans SQLite.
@@ -11,9 +11,10 @@ Dans la barre latérale, cliquer sur l'icone ♜ (Mission Control).
 4. Lors d'un changement de responsable, une passation est historisee.
 5. Dossier de passation : contexte construit a partir des notes, missions, collegues et transferts ; non envoye automatiquement.
 6. + Mission : objectif global. + Attribution : tache affectee a un agent.
-7. Missions & preuves : trois niveaux distincts — « declare » (on affirme), « revu
-   par un humain », « test reellement execute » (commande + code de sortie obligatoires).
-   L'ancienne case « verifie » ne melange plus les trois.
+7. Missions et preuves : l'écran reprend l'état du serveur.
+   Non vérifié, Déclaré, Revu par une personne, Test exécuté, Validé, Refusé.
+   « Validé » n'est pas une case : seul le serveur le pose, après un test réussi et des revues.
+   Une preuve de test se choisit parmi unittest, py_compile et node_check. On ne tape pas de commande.
 8. + Contexte : notes de projet, equipe ou agent.
 9. Connexion : liens de communication ou dependance entre agents ; cycles refuses.
 10. + Job : un agent travaille dans un dossier isole (workspaces\p<projet>\a<agent>\job<n>).

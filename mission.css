@@ -16,3 +16,22 @@
 .mc-toolbar button{padding:8px 12px;font-size:12.5px;white-space:nowrap}
 #mcNodes:empty::after{content:"Aucun agent pour l instant — cree un agent avec le bouton « + Agent ».";position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);color:#938fa4;font-size:13px;text-align:center;max-width:420px;line-height:1.6}
 #mcRecherche{max-width:320px;flex:0 0 320px}
+
+.rail:not(.legacy-open) button.legacy-nav{display:none}
+.dot.hors-ligne{background:#ee8396;box-shadow:none}
+#ancienTableau{width:auto;height:auto;padding:8px 12px;font-size:13px}
+.mc-modes,.mc-groupe{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.mc-groupe[hidden]{display:none !important}
+dialog#mcAuth{border:1px solid #51455f;border-radius:16px;background:#201b2b;color:#eceaf2;padding:22px;max-width:min(440px,92vw)}
+dialog#mcAuth::backdrop{background:#000a}
+.mc-auth-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #b59af6;outline-offset:2px}
+@media(max-width:760px){
+ .header{height:auto;flex-wrap:wrap;padding:8px 10px}
+ .mc-toolbar{padding:8px}
+ .mc-legend{left:8px;right:8px;bottom:84px;max-height:64px;overflow:hidden}
+ .mc-minimap{width:96px;height:58px;right:8px;bottom:8px}
+ .mc-side{left:8px;right:8px;width:auto;top:8px;max-height:60%}
+ .subhead{flex-wrap:wrap;height:auto;padding:8px}
+ #agents .dash h2{white-space:normal}
+}

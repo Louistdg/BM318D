@@ -7,8 +7,13 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 
-const RACINE = 'D:/BM318d-Control-Center';
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+import {fileURLToPath} from 'node:url';
+
+const RACINE = process.env.MC_RACINE || path.dirname(fileURLToPath(import.meta.url));
+const CHROME = process.env.CHROME_PATH || (process.platform === 'win32'
+  ? 'C:/Program Files/Google/Chrome/Application/chrome.exe'
+  : ['/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser']
+      .find(p => fs.existsSync(p)) || '');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let passes = 0, echecs = 0;
 const t = (nom, ok, detail) => {
@@ -105,6 +110,7 @@ const profil = path.join(dossier, 'chrome');
 fs.mkdirSync(profil, {recursive: true});
 const chrome = spawn(CHROME, [
   '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+  ...(process.platform === 'win32' ? [] : ['--no-sandbox', '--disable-dev-shm-usage']),
   '--remote-debugging-port=' + portCDP, '--user-data-dir=' + profil,
   '--window-size=1440,900', 'about:blank'
 ], {stdio: 'ignore'});
@@ -153,7 +159,7 @@ try {
   t('seul le refus HTTP attendu est journalise',c.erreurs().every(x=>/^Failed to load resource: the server responded with a status of 403 \(Forbidden\)$/.test(x)),c.erreurs());
   c.events.length=0;
   const admin=fs.readFileSync(path.join(path.dirname(base),'logs','admin-token.txt'),'utf8').trim();
-  await c.evaluate(`sessionStorage.setItem('mc-admin',${JSON.stringify(admin)})`);
+  await c.evaluate(`window.mcJetonAdmin=${JSON.stringify(admin)}`);
   await c.evaluate(`document.querySelector('#cx-form').requestSubmit()`);await sleep(500);
   t('enregistrement apres authentification administrateur',await c.evaluate(`document.querySelector('dialog').textContent.includes('V23 UI')&&!!document.querySelector('[data-action="edit"]')`));
   await c.evaluate(`document.querySelector('[data-action="toggle"]').click()`);await sleep(400);

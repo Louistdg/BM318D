@@ -25,3 +25,11 @@ Use a disposable copy and temporary databases for tests. Review the command and 
 ## Collaboration
 
 For Grok’s first task, connect only this repository and use the read-only review prompt in `GROK-MISSION-01-PRODUCT-AUDIT.md`. Ask for proposed changes as findings; do not authorize commits or edits during the discovery review.
+
+## Parcours
+
+Mission Control is the screen a new user lands on. `LANCER-MISSION-CONTROL.cmd` and `LANCER-BM318d-RAILWAY.cmd` both start the authenticated local service (port 31880). The Railway launcher no longer starts the older unauthenticated server.
+
+The previous canvas, task list and journal stay available from the **Ancien tableau** button. Their code and data are not removed.
+
+`OUVRIR-BM318d.cmd` only opens a local `index.html` export when that file exists beside the scripts. It does not start the service. The other `LANCER-*.cmd` files still open the older desktop windows (Studio, Unifié, Extensions, `BM318d.pyw`).

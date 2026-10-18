@@ -5,8 +5,8 @@ import fs from 'node:fs';
 const source=fs.readFileSync(new URL('./security-ui.js',import.meta.url),'utf8');
 function fixture(admin='synthetic-admin'){
   const calls=[];
-  const window={location:new URL('http://127.0.0.1:31999/'),fetch:(resource,options)=>{calls.push({resource,options});return Promise.resolve('captured')}};
-  vm.runInNewContext(source,{window,URL,Request,Headers,sessionStorage:{getItem:()=>admin}});
+  const window={location:new URL('http://127.0.0.1:31999/'),mcJetonAdmin:admin,fetch:(resource,options)=>{calls.push({resource,options});return Promise.resolve('captured')}};
+  vm.runInNewContext(source,{window,URL,Request,Headers});
   return {fetch:window.fetch,calls};
 }
 function headers(call){return new Headers(call.options?.headers||(call.resource instanceof Request?call.resource.headers:undefined))}

@@ -9,7 +9,7 @@ window.fetch=(resource,options)=>{
   const method=String(options?.method||request?.method||'GET').toUpperCase();
   if(url.origin===window.location.origin&&url.pathname.startsWith('/api/mc/connectors/')&&url.pathname!=='/api/mc/connectors/list'&&method==='POST'){
     const headers=new Headers(options?.headers||request?.headers);
-    const admin=sessionStorage.getItem('mc-admin')||'';
+    const admin=(typeof window.mcJetonAdmin==='string')?window.mcJetonAdmin:'';
     if(admin&&!headers.has('X-MC-Agent-Token')&&!headers.has('X-MC-Admin')){
       headers.set('X-MC-Admin',admin);options={...options,headers};
     }

@@ -7,8 +7,13 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 
-const RACINE = 'D:/BM318d-Control-Center';
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+import {fileURLToPath} from 'node:url';
+
+const RACINE = process.env.MC_RACINE || path.dirname(fileURLToPath(import.meta.url));
+const CHROME = process.env.CHROME_PATH || (process.platform === 'win32'
+  ? 'C:/Program Files/Google/Chrome/Application/chrome.exe'
+  : ['/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser']
+      .find(p => fs.existsSync(p)) || '');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let passes = 0, echecs = 0;
 const t = (nom, ok, detail) => {
@@ -105,6 +110,7 @@ const profil = path.join(dossier, 'chrome');
 fs.mkdirSync(profil, {recursive: true});
 const chrome = spawn(CHROME, [
   '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+  ...(process.platform === 'win32' ? [] : ['--no-sandbox', '--disable-dev-shm-usage']),
   '--remote-debugging-port=' + portCDP, '--user-data-dir=' + profil,
   '--window-size=1440,900', 'about:blank'
 ], {stdio: 'ignore'});
@@ -136,7 +142,7 @@ try {
 
   console.log('\n=== chargement ===');
   const fixtureAdmin=fs.readFileSync(path.join(path.dirname(base),'logs','admin-token.txt'),'utf8').trim();
-  await c.send('Page.addScriptToEvaluateOnNewDocument',{source:`sessionStorage.setItem('mc-admin',${JSON.stringify(fixtureAdmin)})`});
+  await c.send('Page.addScriptToEvaluateOnNewDocument',{source:`window.mcJetonAdmin=${JSON.stringify(fixtureAdmin)}`});
   await c.naviguer(base_url);
   await sleep(1200);
   t('aucune erreur JavaScript au chargement', c.erreurs().length === 0, c.erreurs());

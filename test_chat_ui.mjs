@@ -104,6 +104,7 @@ const profil = path.join(dossier, 'chrome');
 fs.mkdirSync(profil, {recursive: true});
 const chrome = spawn(CHROME, [
   '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+  ...(process.platform === 'win32' ? [] : ['--no-sandbox', '--disable-dev-shm-usage']),
   '--remote-debugging-port=' + portCDP, '--user-data-dir=' + profil,
   '--window-size=1440,900', 'about:blank'
 ], {stdio: 'ignore'});
