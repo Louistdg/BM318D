@@ -146,5 +146,21 @@ try:
 except ValueError:
     ok('le rapport d\'un job reste dans son projet', True)
 
+print('\n=== rejet du test factice ===')
+faux=appel('/api/mc/job',agent_id=agent,title='Seulement test factice',task='Proposition inutile')['id']
+contenu_faux=('import unittest\n\nclass Faux(unittest.TestCase):\n'
+              '    def test_faux(self):\n        self.assertTrue(True)\n')
+mc.job_executer(faux,generer({'files':[{'path':'test_foo.py','content':contenu_faux}]}))
+appel('/api/mc/job/approve',id=faux,agent_id=agent)
+preuve_fausse=appel('/api/mc/job/test',id=faux,command='unittest',agent_id=agent)
+ok('un unittest factice passe effectivement',preuve_fausse['evidence']['exit_code']==0,preuve_fausse)
+appel('/api/mc/review',job_id=faux,agent_id=agent2,kind='code',verdict='ok')
+appel('/api/mc/review',job_id=faux,kind='tests',verdict='ok')
+try:
+    appel('/api/mc/job/validate',id=faux,agent_id=agent)
+    ok('validation refusée pour job uniquement composé de tests',False)
+except ValueError as erreur:
+    ok('validation refusée pour job uniquement composé de tests','source' in str(erreur).lower(),str(erreur))
+
 print('\n%d ok, %d echec(s)' % (passes, echecs))
 sys.exit(1 if echecs else 0)

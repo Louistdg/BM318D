@@ -482,6 +482,21 @@ def job_valider(c,p,d):
  except ValueError:preuve={}
  if preuve.get('exit_code')!=0:
   raise ValueError('Aucun test réussi enregistré : lance d’abord « Lancer les tests »')
+ # A self-contained green test is not proof of a delivered change.
+ # Only a proposed, non-test source file may unlock final validation.
+ try:proposition=json.loads(j['proposal'] or '{}')
+ except (ValueError,TypeError):proposition={}
+ sources=[]
+ for fichier in proposition.get('files',[]):
+  if not isinstance(fichier,dict):continue
+  chemin=Path(str(fichier.get('path') or ''))
+  morceaux={part.lower() for part in chemin.parts}
+  nom=chemin.stem.lower()
+  if chemin.suffix.lower() not in ('.py','.js','.mjs','.jsx','.ts','.tsx','.html','.css','.sql'):continue
+  if morceaux.intersection({'test','tests','__tests__'}) or nom.startswith('test_') or nom.endswith('_test'):continue
+  if len(str(fichier.get('content') or '').strip())>=16:sources.append(str(chemin))
+ if not sources:
+  raise ValueError('Validation refusée : aucune source développée hors fichiers de tests dans la proposition')
  revues=rows(c,'SELECT kind,verdict,agent_id FROM mc_reviews WHERE job_id=?',(j['id'],))
  mauvaises=[r['kind'] for r in revues if r['verdict']!='ok']
  if mauvaises:raise ValueError('Revue(s) en échec : '+', '.join(mauvaises))
