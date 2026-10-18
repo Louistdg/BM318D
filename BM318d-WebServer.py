@@ -80,7 +80,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
  def do_POST(self):
   try:
    n=int(self.headers.get('Content-Length','0'))
-   limite=300000 if self.path=='/api/ollama' else 16000
+   limite=2*1024*1024 if self.path=='/api/ollama' else 16000
    if n<1 or n>limite:raise ValueError('Invalid size')
    d=json.loads(self.rfile.read(n))
    if self.path=='/api/project':

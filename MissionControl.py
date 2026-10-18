@@ -1254,7 +1254,7 @@ class Handler(legacy.Handler):
   # des octets non lus fait perdre la reponse au client (RST sous Windows).
   try:n=int(self.headers.get('Content-Length','0'))
   except ValueError:n=0
-  limite=160000 if self.path=='/api/ollama' else 12*1024*1024 if self.path=='/api/mc/documents/import' else 16000
+  limite=2*1024*1024 if self.path=='/api/ollama' else 12*1024*1024 if self.path=='/api/mc/documents/import' else 16000
   if n<0 or n>limite:
    self.close_connection=True;return self._refus(413,'Taille invalide (limite %d octets)'%limite)
   corps=self.rfile.read(n) if n else b''
