@@ -35,6 +35,11 @@ class Principal:
     seal:object=dataclasses.field(default=None,repr=False,compare=False)
 
 def operator(session,expected,admin='',expected_admin=''):
+    """Verifie un operateur. Les deux jetons viennent TOUJOURS de la configuration
+    du serveur : les parametres expected/expected_admin sont acceptes pour la
+    compatibilite des appels existants, mais ignores volontairement, pour qu'un
+    appelant ne puisse pas imposer son propre secret."""
+    del expected,expected_admin
     if _CONFIGURATION is None:raise Refus('Autorité non configurée')
     expected,expected_admin=_CONFIGURATION
     if not isinstance(session,str) or not secrets.compare_digest(session,expected):raise Refus('Session non authentifiée')
