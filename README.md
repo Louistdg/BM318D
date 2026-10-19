@@ -21,6 +21,19 @@ connector code, security/sandbox modules, installer scripts, and automated tests
 `AUDIT/00-LIRE-EN-PREMIER.md` describes what to audit, by priority, and lists the
 known limitations so they are not reported as findings.
 `AUDIT/01-COMMENT-TESTER.md` gives the exact commands and expected results.
+`AUDIT/02-AUDIT-DU-SITE.md` covers the public website.
+
+## Repository layout
+
+```
+MissionControl.py      service HTTP local et routes
+mc_*.py                securite, bac a sable, connecteurs, documents, agents, plan
+*.js / *.css           interface Mission Control
+test_*.py              suite de tests (25 fichiers), lancee par test_all.cmd
+installer/             installateur Windows (Inno Setup)
+site/                  source de la vitrine publique (statique)
+AUDIT/                 brief d'audit, commandes de test, audit du site
+```
 
 ## Version history (recent)
 

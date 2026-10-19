@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Installation — DIOPTRE</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://dioptre.socle-construction.be/installation.html">
+<meta name="description" content="Installer DIOPTRE sur Windows : Python 3.14, Ollama, lancement et première ouverture.">
+<style>
+  :root{
+    color-scheme:dark;
+    --fond:#191a1a; --carte:#202222; --bord:#2f3131;
+    --texte:#fbfaf4; --doux:#a8a8a3; --accent:#fbfaf4; --accent-texte:#191a1a;
+    --entete:#191a1ae6; --puce:#2a2c2c; --note:#222424; --note-texte:#cfcec7;
+    --code:#121313; --code-texte:#e4e3dc; --pied:#85857f; --vert:#6fbf9b;
+    --max:860px;
+  }
+  :root[data-theme="nuit"]{
+    --fond:#0e0d15; --carte:#15131f; --bord:#2a2438;
+    --texte:#eceaf2; --doux:#9a92ab; --accent:#b59af6; --accent-texte:#1a1329;
+    --entete:#0e0d15e6; --puce:#2c2440; --note:#171327; --note-texte:#c3bad6;
+    --code:#0b0a11; --code-texte:#cfc7e0; --pied:#736d83; --vert:#65c99c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--fond); color:var(--texte); font:16px/1.7 "Inter","Segoe UI",system-ui,sans-serif}
+  a{color:var(--accent)}
+  .enveloppe{max-width:var(--max); margin:0 auto; padding:0 22px}
+  header{border-bottom:1px solid var(--bord); background:var(--entete); position:sticky; top:0; backdrop-filter:blur(10px)}
+  header .enveloppe{display:flex; align-items:center; height:60px; gap:12px}
+  .marque{display:flex; align-items:center; gap:9px; font-weight:700; letter-spacing:.14em; font-size:12px; color:var(--accent); text-transform:uppercase; text-decoration:none}
+  .point{width:8px; height:8px; border-radius:50%; background:var(--vert)}
+  header nav{margin-left:auto; display:flex; align-items:center; gap:14px; font-size:14px}
+  header nav a{color:var(--doux); text-decoration:none}
+  .bascule{display:inline-flex; align-items:center; gap:7px; padding:7px 12px; border-radius:999px; border:1px solid var(--bord); background:transparent; color:var(--doux); font:inherit; font-size:12.5px; cursor:pointer}
+  .bascule:hover{color:var(--texte)}
+  .bascule .rond{width:10px; height:10px; border-radius:50%; background:var(--accent); border:1px solid var(--bord)}
+  main{padding:44px 0 60px}
+  h1{font-size:clamp(26px,4vw,36px); letter-spacing:-.02em; margin:0 0 8px}
+  p.chapeau{color:var(--doux); margin:0 0 34px; max-width:640px}
+  ol.etapes{list-style:none; padding:0; margin:0; counter-reset:etape}
+  ol.etapes>li{position:relative; padding:20px 22px 20px 62px; border:1px solid var(--bord); border-radius:14px; background:var(--carte); margin-bottom:14px}
+  ol.etapes>li::before{counter-increment:etape; content:counter(etape); position:absolute; left:20px; top:20px; width:28px; height:28px; border-radius:9px; background:var(--puce); color:var(--accent); text-align:center; line-height:28px; font-weight:700; font-size:14px}
+  ol.etapes h2{margin:0 0 6px; font-size:17px}
+  ol.etapes p{margin:0 0 8px; color:var(--doux); font-size:14.5px}
+  .code{display:block; background:var(--code); border:1px solid var(--bord); border-radius:9px; padding:10px 13px; font-family:Consolas,monospace; font-size:13px; color:var(--code-texte); margin:8px 0; overflow:auto}
+  .note{border-left:3px solid var(--accent); padding:10px 16px; background:var(--note); border-radius:0 10px 10px 0; color:var(--note-texte); font-size:14px; margin:18px 0}
+  .btn{display:inline-flex; align-items:center; gap:10px; padding:13px 20px; border-radius:11px; font-weight:650; text-decoration:none; background:var(--accent); color:var(--accent-texte)}
+  .faq{display:grid; gap:12px}
+  .faq details{border:1px solid var(--bord); border-radius:14px; background:var(--carte); padding:0 20px}
+  .faq summary{cursor:pointer; padding:16px 0; font-weight:650; font-size:16px; list-style:none}
+  .faq summary::-webkit-details-marker{display:none}
+  .faq summary::after{content:"+"; float:right; color:var(--doux); font-weight:400}
+  .faq details[open] summary::after{content:"–"}
+  .faq p{margin:0 0 16px; color:var(--doux); font-size:14.5px}
+  footer{border-top:1px solid var(--bord); padding:24px 0 40px; color:var(--pied); font-size:13px}
+  @media (max-width:560px){ol.etapes>li{padding:18px 16px 18px 56px} ol.etapes>li::before{left:14px; top:18px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="enveloppe">
+    <a class="marque" href="index.html"><span class="point" aria-hidden="true"></span> DIOPTRE</a>
+    <nav><a href="index.html">← Accueil</a>
+      <button id="bascule-theme" class="bascule" type="button" aria-pressed="false">
+        <span class="rond" aria-hidden="true"></span><span class="libelle">Theme nuit</span>
+      </button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="enveloppe">
+    <h1>Installer DIOPTRE</h1>
+    <p class="chapeau">Quatre étapes, une seule fois. Compte environ trois minutes, plus le téléchargement de Python.</p>
+
+    <ol class="etapes">
+      <li>
+        <h2>Installer Python 3.14</h2>
+        <p>Téléchargez Python 3.14 depuis <a href="https://www.python.org/downloads/windows/" target="_blank" rel="noopener">python.org</a> et lancez l'installateur.</p>
+        <div class="note">Cochez <strong>« Add python.exe to PATH »</strong> sur la première fenêtre. Sans cette case, DIOPTRE ne peut pas démarrer.</div>
+      </li>
+
+      <li>
+        <h2>Télécharger DIOPTRE</h2>
+        <p>Un seul fichier, l'installateur Windows (2 Mo). Aucune décompression.</p>
+        <a class="btn" href="telechargements/DIOPTRE-Setup-2.5.3.exe" download="DIOPTRE-Setup-2.5.3.exe">↓ Télécharger l'installateur</a>
+      </li>
+
+      <li>
+        <h2>Lancer l'installateur</h2>
+        <p>Double-cliquez sur <strong>DIOPTRE-Setup-2.5.3.exe</strong>. Windows peut afficher un avertissement « application non reconnue » : cliquez sur <em>Informations complémentaires</em> puis <em>Exécuter quand même</em>.</p>
+        <p>L'installation se fait dans votre profil, sans mot de passe administrateur.</p>
+      </li>
+
+      <li>
+        <h2>Ouvrir DIOPTRE</h2>
+        <p>Un raccourci <strong>DIOPTRE</strong> est créé sur le Bureau et dans le menu Démarrer. Double-cliquez dessus : l'interface s'ouvre à l'adresse ci-dessous.</p>
+        <span class="code">http://127.0.0.1:31880/</span>
+        <p>Si le navigateur reste vide, attendez quelques secondes puis rechargez la page.</p>
+      </li>
+    </ol>
+
+    <h2 style="margin-top:38px">Pour le chat avec l'assistant IA</h2>
+    <ol class="etapes">
+      <li>
+        <h2>Installer Ollama</h2>
+        <p>Téléchargez Ollama depuis <a href="https://ollama.com/download" target="_blank" rel="noopener">ollama.com</a>. Il s'installe sans droits administrateur.</p>
+      </li>
+      <li>
+        <h2>Télécharger un modèle</h2>
+        <p>Ouvrez un terminal et lancez la commande suivante (environ 2 Go pour le modèle recommandé).</p>
+        <span class="code">ollama pull qwen2.5:3b</span>
+      </li>
+      <li>
+        <h2>Choisir le modèle dans l'application</h2>
+        <p>Dans l'onglet « Agent IA local », le sélecteur en haut de la page liste les modèles installés. Choisissez-en un : votre choix est mémorisé.</p>
+      </li>
+    </ol>
+
+    <h2 style="margin-top:38px">Questions courantes</h2>
+    <div class="faq">
+      <details>
+        <summary>Où sont mes données ?</summary>
+        <p>Dans le dossier d'installation (<span class="code" style="display:inline;padding:2px 6px">%LOCALAPPDATA%\DIOPTRE</span>), fichier <span class="code" style="display:inline;padding:2px 6px">bm318d.sqlite3</span>, et dans <span class="code" style="display:inline;padding:2px 6px">workspaces/</span> pour les fichiers importés. Rien n'est envoyé sur Internet.</p>
+      </details>
+      <details>
+        <summary>Comment arrêter l'application ?</summary>
+        <p>Fermez la fenêtre noire ouverte au lancement, ou double-cliquez sur <strong>ARRETER-BM318d.cmd</strong> dans le dossier d'installation. L'arrêt propre enregistre la base et ferme le serveur.</p>
+      </details>
+      <details>
+        <summary>Où sont les sauvegardes ?</summary>
+        <p>Dans le sous-dossier <span class="code" style="display:inline;padding:2px 6px">backups/</span>, avec une archive ZIP des fichiers importés. Une sauvegarde automatique est faite toutes les heures.</p>
+      </details>
+      <details>
+        <summary>Le chat répond « Ollama ne répond pas »</summary>
+        <p>Le moteur local n'est pas lancé. Ouvrez l'application Ollama, ou lancez <span class="code" style="display:inline;padding:2px 6px">ollama serve</span> dans un terminal, puis renvoyez le message.</p>
+      </details>
+      <details>
+        <summary>Puis-je l'utiliser sur plusieurs ordinateurs ?</summary>
+        <p>Oui, en copiant le dossier complet, base comprise. Chaque copie garde ses propres données ; il n'y a pas de synchronisation.</p>
+      </details>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="enveloppe">© 2026 DIOPTRE — DIOPTRE 2.5.3 · <a href="index.html">Accueil</a></div>
+</footer>
+
+<script>
+(function(){
+  var cle = 'dioptre-theme';
+  var racine = document.documentElement;
+  function lire(){ try { return localStorage.getItem(cle); } catch(e){ return null; } }
+  function ecrire(v){ try { localStorage.setItem(cle, v); } catch(e){} }
+  if (lire() === 'nuit') { racine.setAttribute('data-theme','nuit'); }
+  var b = document.getElementById('bascule-theme');
+  if (!b) return;
+  function sombre(){ return racine.getAttribute('data-theme') === 'nuit'; }
+  function maj(){
+    b.querySelector('.libelle').textContent = sombre() ? 'Theme nuit' : 'Theme sable';
+    b.title = sombre() ? 'Passer au theme sable' : 'Passer au theme nuit';
+  }
+  b.addEventListener('click', function(){
+    if (sombre()) { racine.removeAttribute('data-theme'); ecrire('sable'); }
+    else { racine.setAttribute('data-theme','nuit'); ecrire('nuit'); }
+    maj();
+  });
+  maj();
+})();
+</script>
+</body>
+</html>
