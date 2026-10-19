@@ -1,0 +1,4 @@
+# Scope: DIOPTRE virtual host / directory only.
+RewriteEngine On
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ https://dioptre.socle-construction.be%{REQUEST_URI} [R=301,L,NE]

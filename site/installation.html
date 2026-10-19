@@ -72,7 +72,7 @@
 <main>
   <div class="enveloppe">
     <h1>Installer DIOPTRE</h1>
-    <p class="chapeau">Quatre étapes, une seule fois. Compte environ trois minutes, plus le téléchargement de Python.</p>
+    <p class="chapeau">Quatre étapes, une seule fois. Prévoyez l’installation de Python 3.14 avant DIOPTRE ; la durée dépend des téléchargements. Ollama est facultatif.</p>
 
     <ol class="etapes">
       <li>
@@ -83,13 +83,13 @@
 
       <li>
         <h2>Télécharger DIOPTRE</h2>
-        <p>Un seul fichier, l'installateur Windows (2 Mo). Aucune décompression.</p>
-        <a class="btn" href="telechargements/DIOPTRE-Setup-2.8.4.exe" download="DIOPTRE-Setup-2.8.4.exe">↓ Télécharger l'installateur</a>
+        <p>Un seul fichier, l'installateur Windows (2 Mo), révision 1. Il vérifie Python 3.14 et son lanceur sans console avant toute copie. Si le contrôle échoue, installez Python en cochant « Add python.exe to PATH », puis relancez l’installateur.</p>
+        <a class="btn" href="https://dioptre.socle-construction.be/telechargements/DIOPTRE-Setup-2.8.4-r1.exe" download="DIOPTRE-Setup-2.8.4-r1.exe">↓ Télécharger l'installateur</a>
       </li>
 
       <li>
         <h2>Lancer l'installateur</h2>
-        <p>Double-cliquez sur <strong>DIOPTRE-Setup-2.8.4.exe</strong>. Windows peut afficher un avertissement « application non reconnue » : cliquez sur <em>Informations complémentaires</em> puis <em>Exécuter quand même</em>.</p>
+        <p>Double-cliquez sur <strong>DIOPTRE-Setup-2.8.4-r1.exe</strong>. Windows peut afficher un avertissement « application non reconnue » : cliquez sur <em>Informations complémentaires</em> puis <em>Exécuter quand même</em>.</p>
         <p>L'installation se fait dans votre profil, sans mot de passe administrateur.</p>
       </li>
 
@@ -122,11 +122,11 @@
     <div class="faq">
       <details>
         <summary>Où sont mes données ?</summary>
-        <p>Dans le dossier d'installation (<span class="code" style="display:inline;padding:2px 6px">%LOCALAPPDATA%\DIOPTRE</span>), fichier <span class="code" style="display:inline;padding:2px 6px">dioptre.sqlite3</span>, et dans <span class="code" style="display:inline;padding:2px 6px">workspaces/</span> pour les fichiers importés. Rien n'est envoyé sur Internet.</p>
+        <p>Dans le dossier d'installation (<span class="code" style="display:inline;padding:2px 6px">%LOCALAPPDATA%\DIOPTRE</span>), fichier <span class="code" style="display:inline;padding:2px 6px">dioptre.sqlite3</span>, et dans <span class="code" style="display:inline;padding:2px 6px">workspaces/</span> pour les fichiers importés. Avec Ollama, les échanges restent locaux. Si vous activez un connecteur cloud, vos demandes sont transmises au fournisseur choisi.</p>
       </details>
       <details>
         <summary>Comment arrêter l'application ?</summary>
-        <p>Fermez la fenêtre noire ouverte au lancement, ou double-cliquez sur <strong>ARRETER-DIOPTRE.cmd</strong> dans le dossier d'installation. L'arrêt propre enregistre la base et ferme le serveur.</p>
+        <p>DIOPTRE fonctionne en arrière-plan, sans fenêtre de terminal. Fermer l’onglet du navigateur ne suffit pas à arrêter le service. Double-cliquez sur <strong>ARRETER-DIOPTRE.cmd</strong> dans le dossier d'installation. L'arrêt propre enregistre la base et ferme le serveur.</p>
       </details>
       <details>
         <summary>Où sont les sauvegardes ?</summary>
@@ -159,6 +159,7 @@
   if (!b) return;
   function sombre(){ return racine.getAttribute('data-theme') === 'nuit'; }
   function maj(){
+    b.setAttribute('aria-pressed', String(sombre()));
     b.querySelector('.libelle').textContent = sombre() ? 'Theme nuit' : 'Theme sable';
     b.title = sombre() ? 'Passer au theme sable' : 'Passer au theme nuit';
   }

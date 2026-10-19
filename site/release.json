@@ -1,0 +1,14 @@
+{
+  "application_version": "2.8.4",
+  "installer_revision": 1,
+  "installer": {
+    "filename": "DIOPTRE-Setup-2.8.4-r1.exe",
+    "size": 2151047,
+    "sha256": "ce007c58e79c6ec30df0b2b5b5c648414d8fb60f80e4dc9cd16fb8403bab4ab2"
+  },
+  "audit": {
+    "filename": "DIOPTRE-AUDIT-2.8.4.zip",
+    "size": 4038486,
+    "sha256": "93d0b10dfc82f1e4deae58322fd71647b039e69290a105d116410a067e3c9c33"
+  }
+}
