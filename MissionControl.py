@@ -9,6 +9,7 @@ import mc_documents
 import mc_legacy
 import mc_backups
 import mc_missions
+import mc_corbeille
 import mc_jobs
 from mc_actions import action
 import mc_routes
@@ -485,7 +486,7 @@ def charge_agents(c,p):
 
 # --- P7 : application, reglages, recherche, sauvegardes ----------------------
 SERVEUR=[None]
-VERSION='2.8.0'
+VERSION='2.8.1'
 MAX_TEXTE=200000
 MAX_PREUVE=8000
 ADMIN_TOKEN=os.environ.get('MC_ADMIN_TOKEN') or secrets.token_urlsafe(24)
@@ -599,6 +600,18 @@ def agent_modifier(c,p,d):
 mc_jobs.lier(sys.modules[__name__])
 job_publie,job_creer,job_lancer,job_pause,job_reprendre,job_en_arriere,job_executer=mc_jobs.job_publie,mc_jobs.job_creer,mc_jobs.job_lancer,mc_jobs.job_pause,mc_jobs.job_reprendre,mc_jobs.job_en_arriere,mc_jobs.job_executer
 job_approuver,job_refuser,job_annuler,auteur_preuve,job_tester,review_creer,job_valider,job_commit,rapport_job=mc_jobs.job_approuver,mc_jobs.job_refuser,mc_jobs.job_annuler,mc_jobs.auteur_preuve,mc_jobs.job_tester,mc_jobs.review_creer,mc_jobs.job_valider,mc_jobs.job_commit,mc_jobs.rapport_job
+def purger_corbeille(c,p,d):
+ racines=[reglages(c,p).get('workspace_dir'), str(mc_agent.WORKSPACES)]
+ try:jours=int(d.get('jours') or 30)
+ except (TypeError,ValueError):raise ValueError('Duree de retention invalide')
+ if jours<1 or jours>3650:raise ValueError('Duree de retention hors limites (1 a 3650 jours)')
+ try:plafond=int(d.get('taille_max_mo') or 0)
+ except (TypeError,ValueError):plafond=0
+ resultat=mc_corbeille.purger([r for r in racines if r],jours,plafond,simulation=bool(d.get('simulation')))
+ audit(c,p,'corbeille_purgee',resultat)
+ return resultat
+
+
 ROUTES=mc_routes.construire(sys.modules[__name__])
 
 
@@ -801,7 +814,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
   corps=self.rfile.read(n) if n else b''
   if not self._api_autorisee():return
   if not self._limite_ok():return self._refus(429,'Trop de requêtes : patientez une minute')
-  if self.path in ('/api/mc/restore','/api/mc/settings','/api/mc/shutdown'):
+  if self.path in ('/api/mc/restore','/api/mc/settings','/api/mc/shutdown','/api/mc/corbeille/purge'):
    if not secrets.compare_digest(self.headers.get('X-MC-Admin') or '',ADMIN_TOKEN):
     return self._refus(403,'Jeton administrateur requis')
   if 'application/json' not in (self.headers.get('Content-Type') or '').lower():

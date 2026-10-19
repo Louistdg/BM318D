@@ -55,6 +55,7 @@ def construire(m):
         '/api/mc/plan/apply': lambda c, p, d: m.plan_appliquer(c, p, d),
         '/api/mc/orchestrator/run': lambda c, p, d: m.orchestrateur_lancer(c, p, d),
         '/api/mc/charge': lambda c, p, d: m.charge_agents(c, p),
+        '/api/mc/corbeille/purge': lambda c, p, d: m.purger_corbeille(c, p, d),
     }
 
 

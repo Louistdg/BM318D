@@ -9,6 +9,7 @@ import sqlite3
 import time
 
 import mc_documents
+import mc_corbeille
 
 
 def _texte(d, k, maxlen=500):
@@ -95,5 +96,6 @@ def boucle(racine, base, minutes):
             sauvegarder(racine, base,
                         dossier / ('dioptre-auto-' + datetime.datetime.now().strftime('%Y%m%d-%H%M%S') + '.sqlite3'))
             rotation(racine, 10)
+            mc_corbeille.purger([racine / 'workspaces'], mc_corbeille.RETENTION_JOURS)
         except Exception:
             pass
