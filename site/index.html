@@ -98,6 +98,10 @@
   footer{border-top:1px solid var(--bord); padding:28px 0 44px; color:var(--pied); font-size:13px}
   footer .enveloppe{display:flex; flex-wrap:wrap; gap:10px 22px; align-items:center}
 
+.mascotte{display:flex;align-items:center;gap:12px;margin-top:14px;font-size:13px;color:var(--doux)}
+.mascotte img{width:44px;height:44px;border-radius:50%;flex:none}
+.mascotte strong{color:var(--texte)}
+
   @media (max-width:900px){
     .grille{grid-template-columns:repeat(2,1fr)}
     .deux{grid-template-columns:1fr}
@@ -132,7 +136,7 @@
 <main>
   <section class="hero">
     <div class="enveloppe">
-      <div class="marque"><span class="point" aria-hidden="true"></span> DIOPTRE · version 2.8.3</div>
+      <div class="marque"><span class="point" aria-hidden="true"></span> DIOPTRE · version 2.8.4</div>
       <h1>Vos projets, vos agents IA, vos preuves. Au même endroit, sur votre machine.</h1>
       <p class="accroche">
         DIOPTRE organise vos missions, vos tâches, vos agents et vos documents, avec un
@@ -146,7 +150,7 @@
         <li>Accès protégé par jeton</li>
       </ul>
       <div class="boutons">
-        <a class="btn btn-primaire" href="telechargements/DIOPTRE-Setup-2.8.3.exe" download="DIOPTRE-Setup-2.8.3.exe">
+        <a class="btn btn-primaire" href="telechargements/DIOPTRE-Setup-2.8.4.exe" download="DIOPTRE-Setup-2.8.4.exe">
           ↓ Télécharger pour Windows (2 Mo)
         </a>
         <a class="btn btn-secondaire" href="installation.html">Guide d'installation</a>
@@ -189,14 +193,18 @@
       <p class="intro">L'installateur pose l'application sur votre PC, sans base de données ni secret. Vos données restent chez vous.</p>
       <div class="deux">
         <div class="bloc">
-          <h3 style="margin:0 0 6px">DIOPTRE 2.8.3 — Windows</h3>
-          <p style="color:var(--doux); margin:0 0 18px">Installateur Windows de 2 Mo, version 2.8.3 du 19 octobre 2026.</p>
-          <a class="btn btn-primaire" href="telechargements/DIOPTRE-Setup-2.8.3.exe" download="DIOPTRE-Setup-2.8.3.exe">↓ Télécharger l'installateur</a>
+          <h3 style="margin:0 0 6px">DIOPTRE 2.8.4 — Windows</h3>
+          <p style="color:var(--doux); margin:0 0 18px">Installateur Windows de 2 Mo, version 2.8.4 du 19 octobre 2026.</p>
+          <a class="btn btn-primaire" href="telechargements/DIOPTRE-Setup-2.8.4.exe" download="DIOPTRE-Setup-2.8.4.exe">↓ Télécharger l'installateur</a>
           <span class="sous-bouton">Double-cliquez ensuite sur le fichier téléchargé : il installe DIOPTRE et crée un raccourci sur le Bureau.</span>
           <div class="note" style="margin-top:18px">
             <strong>Vérifier le fichier téléchargé</strong><br>
-            Taille : 2150262 octets (2.05 Mo)<br>
-            SHA-256 : <span style="font-family:Consolas,monospace;font-size:12px;word-break:break-all">cbd56afc979a66a0b25a6f8e8f1a04346fe970882a6b42aede7fc089e99074be</span>
+            Taille : 2150541 octets (2.05 Mo)<br>
+            SHA-256 : <span style="font-family:Consolas,monospace;font-size:12px;word-break:break-all">3bcd22fc9d34a20c76e001f0a46119c851fe5eda683ab098793b09ffa1f7daa2</span>
+          </div>
+          <div class="note" style="margin-top:12px">
+            <strong>Paquet d'audit 2.8.4</strong> — 3841164 octets<br>
+            SHA-256 : <span style="font-family:Consolas,monospace;font-size:12px;word-break:break-all">a3b8cd9671d0b9ec5fa98b294f414b27e8a42eb0d5dccbc8abf5ba21ac1c368f</span>
           </div>
 
         </div>
@@ -229,10 +237,14 @@
 
 <footer>
   <div class="enveloppe">
-    <span>© 2026 DIOPTRE — DIOPTRE 2.8.3</span>
+    <span>© 2026 DIOPTRE — DIOPTRE 2.8.4</span>
     <span>Page sans traceur, sans cookie, sans statistique.</span>
     <a href="installation.html">Guide d'installation</a>
     <a href="https://socle-construction.be">Site principal</a>
+  </div>
+  <div class="enveloppe mascotte">
+    <img src="assets/mascotte-pastat-64.png" alt="Mascotte PastaTShield" width="44" height="44" loading="lazy">
+    <span>La mascotte du projet — <strong>PastaTShield</strong>, un doute ? on vérifie.</span>
   </div>
 </footer>
 
