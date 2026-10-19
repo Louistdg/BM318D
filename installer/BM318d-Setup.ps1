@@ -9,15 +9,17 @@ $ErrorActionPreference = 'Stop'
 $source = Split-Path -Parent $PSScriptRoot
 New-Item -ItemType Directory -Force -Path $TargetDir | Out-Null
 
-$fichiers = @('MissionControl.py','mc_agent.py','mc_plan.py','mc_sandbox.py','mc_sandbox_wsl.py','mc_sandbox_linux.py','mc_security.py','mc_connectors.py','mc_credentials.py','BM318d-WebServer.py',
-              'BM318d-Railway.html','mission.js','mission.css','connectors.js','security-ui.js','requirements-v22.txt','V2.2-IMPLEMENTATION.md','V2.3-SECURITE.md',
-              'BM318d-Controleur.pyw','BM318d-Stop.py',
-              'MISSION-CONTROL-LISEZMOI.txt','README.txt')
+$fichiers = @('MissionControl.py','mc_agent.py','mc_plan.py','mc_sandbox.py','mc_sandbox_wsl.py','mc_sandbox_linux.py','mc_security.py','mc_connectors.py','mc_credentials.py','mc_documents.py','BM318d-WebServer.py',
+              'BM318d-Railway.html','mission.js','mission.css','connectors.js','security-ui.js','workspace.js','workspace.css','installer\version.json',
+              'BM318d-Controleur.pyw','BM318d-Stop.py','LANCER-BM318d-RAILWAY.cmd','requirements-v22.txt',
+              'README.md','MISSION-CONTROL-LISEZMOI.txt','docs\DELIVERY-V25-HOTFIX.md','docs\SECURITY-STATUS.md')
 $copies = 0
 foreach ($nom in $fichiers) {
   $chemin = Join-Path $source $nom
   if (Test-Path $chemin) {
-    Copy-Item $chemin (Join-Path $TargetDir $nom) -Force
+    $destination = Join-Path $TargetDir $nom
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
+    Copy-Item $chemin $destination -Force
     $copies++
   }
 }

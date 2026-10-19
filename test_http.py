@@ -144,7 +144,18 @@ try:
                              {**auth, 'Content-Type': 'text/plain'})
     ok('Content-Type non JSON -> 415', code == 415, (code, corps[:120]))
     code, corps, _ = appeler(base_url + '/api/mc/agent', 'POST', b'x' * 20000, auth)
-    ok('corps trop gros -> 400', code == 400, (code, corps[:120]))
+    ok('corps trop gros -> 413', code == 413, (code, corps[:120]))
+    code, corps, _ = appeler(base_url + '/api/ollama', 'POST',
+                             {'project': 999, 'prompt': 'x' * 20000}, auth)
+    ok('chat accepte un corps de plus de 16 Ko puis valide le projet', code == 400 and 'Invalid prompt' in corps, (code, corps[:120]))
+    code, corps, _ = appeler(base_url + '/api/ollama', 'POST',
+                             {'project': 999, 'prompt': 'é' * 120000}, auth)
+    ok('chat transporte 120 000 caractères Unicode sans troncature',
+       code == 400 and 'Invalid prompt' in corps, (code, corps[:120]))
+    code, corps, _ = appeler(base_url + '/api/ollama', 'POST',
+                             {'project': 999, 'prompt': 'é' * 120001}, auth)
+    ok('chat refuse explicitement 120 001 caractères',
+       code == 400 and '120 000' in corps, (code, corps[:120]))
     code, corps, _ = appeler(base_url + '/api/mc/agent', 'POST', {'project': 1, 'name': 'X', 'role': 'pirate'}, auth)
     ok('role inconnu -> 400', code == 400, (code, corps[:120]))
     code, corps, _ = appeler(base_url + '/api/mc/agent', 'POST', {'project': 999, 'name': 'X', 'role': 'manager'}, auth)

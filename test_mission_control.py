@@ -1,4 +1,4 @@
-import tempfile,sqlite3
+import os,tempfile,sqlite3
 from pathlib import Path
 from test_support_v23 import broker_fixture
 import MissionControl as mc
@@ -38,5 +38,19 @@ with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
   s=mc.snapshot(conn,1)
   assert s['assignments'][0]['verified']==1
   assert len(s['notes'])==1 and len(s['audit'])>=10
+ dossier=Path(d)/'fichiers-projet'
+ call('/api/mc/settings',key='workspace_dir',value=str(dossier))
+ with mc.connect() as conn:
+  assert mc.reglages(conn,1)['workspace_dir']==str(dossier.resolve())
+  job=mc.job_creer(conn,1,{'agent_id':dev,'title':'Fichier local','task':'Préparer un rapport'})
+ assert Path(job['workspace']).is_relative_to(dossier.resolve())
+ assert Path(job['workspace']).is_dir()
+ try:call('/api/mc/settings',key='workspace_dir',value='chemin-relatif');raise AssertionError('Relative workspace accepted')
+ except ValueError:pass
+ if os.name=='nt':
+  for bad in ('E:\\BM318d-test','C:\\'):
+   try:call('/api/mc/settings',key='workspace_dir',value=bad);raise AssertionError('Unsafe drive accepted: '+bad)
+   except ValueError:pass
+ with mc.connect() as conn:assert mc.reglages(conn,1)['workspace_dir']==str(dossier.resolve())
  print('PASS: agents dynamiques, transfert, passation, cycles, mission, attribution, validation, mémoire, audit')
 mc.DB=original

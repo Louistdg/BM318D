@@ -16,6 +16,9 @@ const CHROME = process.env.CHROME_PATH || (process.platform === 'win32'
       .find(p => fs.existsSync(p)) || '');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let passes = 0, echecs = 0;
+let refus400Attendus = 0;
+const aucuneErreurInattendue = c => c.erreurs().every(e => /status of 400/i.test(e)) &&
+  c.events.filter(e => e.method === 'Log.entryAdded' && e.params.entry.level === 'error' && /status of 400/i.test(e.params.entry.text)).length === refus400Attendus;
 const t = (nom, ok, detail) => {
   if (ok) { passes++; console.log('  ok    ' + nom); }
   else { echecs++; console.log('  ECHEC ' + nom + (detail !== undefined ? '  -> ' + JSON.stringify(detail).slice(0, 300) : '')); }
@@ -146,7 +149,33 @@ try {
   await c.naviguer(base_url);
   await sleep(1200);
   t('aucune erreur JavaScript au chargement', c.erreurs().length === 0, c.erreurs());
+  t('le canevas démarre avec un zoom plus rapproché', await c.evaluate(`document.getElementById('world').style.transform.includes('scale(1.15)')`));
+  t('la palette bleu ardoise et accent ciel est appliquée', await c.evaluate(`getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()==='#0c1420' && getComputedStyle(document.documentElement).getPropertyValue('--violet').trim()==='#82cfff'`));
+  await c.evaluate(`document.querySelector('.legacy-nav[data-page=\"overview\"]').click()`); await sleep(300);
+  t('la vue d’ensemble ne fabrique pas d’agents', await c.evaluate(`!/IA 1|Architecture|Développement|Audit/.test(document.getElementById('agentCards').textContent)`));
+  await c.evaluate(`document.querySelector('.legacy-nav[data-page=\"canvas\"]').click()`);
   t('la barre laterale a le bouton Mission Control', await c.evaluate(`!!document.querySelector('.rail button[data-page="mission"]')`));
+  t('le logo BM318d affiche son monogramme vectoriel accessible', await c.evaluate(`document.querySelector('.rail .logo[aria-label="Logo BM318d"] .brand-mark path')!==null`));
+  t('les icônes de navigation sont des pictogrammes cohérents en SVG', await c.evaluate(`document.querySelectorAll('.rail button[data-page] .icon-svg').length>=6 && document.querySelectorAll('.workspace-link .icon-svg').length===8`));
+  t('la nouvelle navigation affiche le panneau projet et le rail compact', await c.evaluate(`!!document.querySelector('.workspace-sidebar') && !!document.querySelector('.workspace-grip') && document.querySelector('.rail').getBoundingClientRect().width < 80`));
+  t('le canevas historique est l’accueil sans bouton Ancien tableau', await c.evaluate(`document.getElementById('canvas').classList.contains('active') && !document.getElementById('ancienTableau')`));
+  t('le canevas vide propose un accueil utile dans le style de la maquette', await c.evaluate(`!!document.querySelector('.canvas-welcome') && document.querySelectorAll('.canvas-welcome-features>div').length===3`));
+  await c.evaluate(`document.getElementById('emptyOverview').click()`); await sleep(100);
+  t('le raccourci de l’accueil ouvre la vraie vue d’ensemble', await c.evaluate(`document.getElementById('overview').classList.contains('active')`));
+  await c.evaluate(`document.querySelector('.workspace-link[data-workspace-page="canvas"]').click()`); await sleep(100);
+  await c.evaluate(`document.getElementById('emptyNewTask').click()`); await sleep(80);
+  t('le raccourci de l’accueil ouvre le vrai formulaire de tâche', await c.evaluate(`document.getElementById('modalback').classList.contains('open')`));
+  await c.evaluate(`document.getElementById('cancel').click()`);
+  await c.evaluate(`document.querySelector('.workspace-link[data-workspace-page="tasks"]').click()`); await sleep(100);
+  t('la navigation ouvre les tâches et expose le choix actif aux lecteurs d’écran', await c.evaluate(`document.getElementById('tasks').classList.contains('active') && document.querySelector('.workspace-link[data-workspace-page="tasks"]').getAttribute('aria-current')==='page'`));
+  await c.evaluate(`document.querySelector('.workspace-link[data-workspace-page="canvas"]').click()`); await sleep(100);
+  const largeurAvant=await c.evaluate(`Number(document.getElementById('workspaceGrip').getAttribute('aria-valuenow'))`);
+  await c.evaluate(`document.getElementById('workspaceGrip').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}))`);
+  t('la largeur du panneau projet est ajustable au clavier', await c.evaluate(`Number(document.getElementById('workspaceGrip').getAttribute('aria-valuenow'))===${largeurAvant+16}`));
+  await c.evaluate(`document.getElementById('sidebarToggle').click()`);
+  t('le panneau projet peut être réduit', await c.evaluate(`document.body.classList.contains('sidebar-collapsed')`));
+  await c.evaluate(`document.getElementById('sidebarToggle').click()`);
+  t('le panneau projet peut être rouvert', await c.evaluate(`!document.body.classList.contains('sidebar-collapsed')`));
   t('la page contient un jeton de session', await c.evaluate(`(document.querySelector('meta[name="mc-token"]')||{}).content||''`).then(v => (v || '').length > 20));
 
   const lireEtat = async () => JSON.parse(await c.evaluate(`(async () => JSON.stringify(await (await fetch('/api/mc/state?project='+Number(document.getElementById('project').value),{headers:{'X-MC-Token':(document.querySelector('meta[name="mc-token"]')||{}).content}})).json()))()`));
@@ -392,7 +421,7 @@ try {
   }
   await sleep(500);
   const boutonsJob = await c.evaluate(`(() => [...document.querySelectorAll('[data-job]')].map(b => b.textContent))()`);
-  t('les boutons de revue apparaissent', ['Audit sécu','Revue code','Valider','Commit','Rapport'].every(x => boutonsJob.includes(x)), boutonsJob);
+  t('les boutons de revue apparaissent', ['Audit sécu','Revue code','Revue tests (humaine)','Valider','Commit','Rapport'].every(x => boutonsJob.includes(x)), boutonsJob);
 
   await c.evaluate(`(() => { const s=document.getElementById('mcActeur'); if(s && s.options.length) s.value=s.options[0].value; })()`);
   await c.evaluate(`(() => { const b=[...document.querySelectorAll('[data-job]')].find(x=>x.textContent==='Audit sécu'); if(b) b.click(); })()`);
@@ -405,6 +434,8 @@ try {
   })()`);
   t('l\'audit de securite enregistre une revue', revues >= 1, revues);
 
+  await c.evaluate(`(() => { window.confirm=()=>true; const b=[...document.querySelectorAll('[data-job]')].find(x=>x.textContent==='Revue tests (humaine)'); if(b) b.click(); })()`);
+  await sleep(900);
   await c.evaluate(`(() => { const b=[...document.querySelectorAll('[data-job]')].find(x=>x.textContent==='Valider'); if(b) b.click(); })()`);
   await sleep(2600);
   const statutJob = await c.evaluate(`(async () => {
@@ -413,7 +444,9 @@ try {
     const s=await (await fetch('/api/mc/state?project='+p,{headers:{'X-MC-Token':t}})).json();
     return (s.jobs||[])[0].status;
   })()`);
-  t('le bouton Valider termine le job', statutJob === 'completed', statutJob);
+  t('le bouton Valider refuse un job simulé sans source livrée', statutJob === 'approved', statutJob);
+  refus400Attendus = c.events.filter(e => e.method === 'Log.entryAdded' && e.params.entry.level === 'error' && /status of 400/i.test(e.params.entry.text)).length;
+  t('le refus de validation est visible comme HTTP 400', refus400Attendus === 1, refus400Attendus);
 
   console.log('\n=== roles, duplication, recrutement ===');
   await c.evaluate(`document.getElementById('mcRol').click()`);
@@ -545,13 +578,20 @@ try {
   if (projets.length > 1) {
     await c.evaluate(`(() => { const s=document.getElementById('project'); s.value='${projets[projets.length - 1]}'; s.dispatchEvent(new Event('change')); })()`);
     await sleep(1200);
-    t('le changement de projet ne casse pas la page', c.erreurs().length === 0, c.erreurs());
+    t('le changement de projet ne casse pas la page', aucuneErreurInattendue(c), c.erreurs());
   } else {
     console.log('  (un seul projet dans la base isolee : changement non testable)');
   }
 
+  console.log('\n=== navigation mobile ===');
+  await c.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+  await c.evaluate(`document.getElementById('sidebarToggle').click()`); await sleep(220);
+  t('le panneau projet s’ouvre depuis le bouton de navigation mobile', await c.evaluate(`document.body.classList.contains('sidebar-mobile-open')`));
+  await c.evaluate(`document.querySelector('.workspace-link[data-workspace-page="overview"]').click()`); await sleep(120);
+  t('la navigation mobile ouvre la vue demandée et replie le panneau', await c.evaluate(`document.getElementById('overview').classList.contains('active') && !document.body.classList.contains('sidebar-mobile-open')`));
+
   console.log('\n=== fin ===');
-  t('aucune erreur JavaScript a la fin', c.erreurs().length === 0, c.erreurs());
+  t('aucune erreur JavaScript inattendue a la fin', aucuneErreurInattendue(c), c.erreurs());
 } finally {
   if (c) { try { await Promise.race([c.send('Browser.close'), sleep(2000)]); } catch {} }
   chrome.kill();

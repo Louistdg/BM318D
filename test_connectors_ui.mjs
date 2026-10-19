@@ -157,7 +157,7 @@ try {
 
   const lireEtat = async () => JSON.parse(await c.evaluate(`(async () => JSON.stringify(await (await fetch('/api/mc/state?project='+Number(document.getElementById('project').value),{headers:{'X-MC-Token':(document.querySelector('meta[name="mc-token"]')||{}).content}})).json()))()`));
   console.log('\n=== connecteurs V2.2 ===');
-  await c.evaluate(`[...document.querySelectorAll('button')].find(b=>b.textContent==='Connecteurs IA / MCP').click()`);
+  await c.evaluate(`document.querySelector('.workspace-link[data-workspace-page="connectors"]').click()`);
   await sleep(600);
   t('gestionnaire ouvert',await c.evaluate(`document.querySelector('dialog').open`));
   t('verrou sécurité visible',await c.evaluate(`document.querySelector('dialog').textContent.includes('bloquées')`));

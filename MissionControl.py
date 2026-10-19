@@ -5,6 +5,7 @@ import mc_agent
 import mc_plan
 import mc_connectors
 import mc_security
+import mc_documents
 import contextvars,functools,inspect
 ROOT=Path(__file__).resolve().parent
 spec=importlib.util.spec_from_file_location('legacy',ROOT/'BM318d-WebServer.py')
@@ -20,7 +21,7 @@ PORT=int(os.environ.get('MC_PORT') or 31880)
 TOKEN=os.environ.get('MC_TOKEN') or secrets.token_urlsafe(24)
 ORIGINES={'http://127.0.0.1:%d'%PORT,'http://localhost:%d'%PORT}
 LIMITE=int(os.environ.get('MC_RATE_LIMIT') or 60)  # requetes POST par minute
-_fenetre=[0.0,0]
+_fenetres={}
 LOCK=threading.RLock()
 ROLES=('manager','architect','frontend','backend','database','tester','auditor','security','documentation','specialist')
 STATUSES=('idle','working','blocked','done','paused','archived')
@@ -35,11 +36,25 @@ def connect():
  c.execute('PRAGMA busy_timeout=20000')
  return c
 def init():
+ # Create legacy canvas tables on a clean install, preserving existing rows.
+ with connect() as c:
+  c.executescript("""
+  CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY, name TEXT NOT NULL, created TEXT DEFAULT CURRENT_TIMESTAMP);
+  CREATE TABLE IF NOT EXISTS tasks(id INTEGER PRIMARY KEY, project_id INTEGER, title TEXT, priority TEXT, agent TEXT, status TEXT DEFAULT 'todo', created TEXT DEFAULT CURRENT_TIMESTAMP);
+  CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY, project_id INTEGER, created TEXT DEFAULT CURRENT_TIMESTAMP, agent TEXT, status TEXT, message TEXT);
+  CREATE TABLE IF NOT EXISTS task_dependencies(task_id INTEGER NOT NULL,depends_on INTEGER NOT NULL,PRIMARY KEY(task_id,depends_on));
+  CREATE TABLE IF NOT EXISTS canvas_positions(project_id INTEGER NOT NULL,task_id INTEGER PRIMARY KEY,x INTEGER NOT NULL,y INTEGER NOT NULL);
+  """)
+  if not c.execute('SELECT 1 FROM projects LIMIT 1').fetchone():c.execute("INSERT INTO projects(name) VALUES('Mon premier projet')")
  # One coherent SQLite backup before the first additive V2.2 migration.
  with connect() as probe:
   needs_v22=not probe.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mc_connectors'").fetchone()
- if needs_v22 and DB.exists():
-  sauvegarder(DB.parent/'backups'/('v22-before-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.sqlite3'))
+  needs_documents=not probe.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mc_documents'").fetchone()
+  document_columns={r[1] for r in probe.execute('PRAGMA table_info(mc_documents)')} if not needs_documents else set()
+ needs_document_storage=not needs_documents and not {'storage_path','storage_root'}.issubset(document_columns)
+ if DB.exists() and (needs_v22 or needs_documents or needs_document_storage):
+  prefix='v22-before-' if needs_v22 else 'before-documents-' if needs_documents else 'before-document-storage-'
+  sauvegarder(DB.parent/'backups'/(prefix+datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.sqlite3'))
  with connect() as c:
   c.executescript("""
   CREATE TABLE IF NOT EXISTS mc_agents(
@@ -160,14 +175,21 @@ def init():
   # Reprise apres crash : un job reste « running » alors que le processus a disparu.
   c.execute("UPDATE mc_jobs SET status='failed',error='interrompu par un redémarrage du serveur',finished_at=CURRENT_TIMESTAMP WHERE status='running'")
   mc_connectors.migrate(c)
+  mc_documents.migrate(c)
 
-def sauvegarder(destination=None):
+def sauvegarder(destination=None, *, inclure_imports=True):
  # Copie en ligne (API backup de SQLite) : coherente meme si le serveur ecrit.
- destination=Path(destination) if destination else ROOT/'backups'/('bm318d-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'.sqlite3')
+ if not DB.is_file():return None
+ destination=Path(destination) if destination else ROOT/'backups'/('bm318d-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.sqlite3')
  destination.parent.mkdir(parents=True,exist_ok=True)
- source=sqlite3.connect(DB,timeout=20);cible=sqlite3.connect(destination)
- try:source.backup(cible)
- finally:cible.close();source.close()
+ source=sqlite3.connect(DB,timeout=20)
+ try:
+  cible=sqlite3.connect(destination)
+  try:source.backup(cible)
+  finally:cible.close()
+ finally:source.close()
+ if inclure_imports:
+  mc_documents.backup_imports(destination,destination.with_suffix('.imports.zip'))
  return destination
 def rows(c,q,a=()):
  return [dict(r) for r in c.execute(q,a).fetchall()]
@@ -252,7 +274,7 @@ def job_creer(c,p,d):
  modele=str(d.get('model') or a['model']).strip()[:80] or a['model']
  cur=c.execute('INSERT INTO mc_jobs(project_id,agent_id,mission_id,assignment_id,title,task,model,depends_on,branch_id) VALUES(?,?,?,?,?,?,?,?,?)',(p,a['id'],mission,attribution,titre,tache,modele,depend,branche))
  job=cur.lastrowid
- racine=mc_agent.racine_workspace(p,a['id'],job)
+ racine=mc_agent.racine_workspace(p,a['id'],job,reglages(c,p).get('workspace_dir'))
  c.execute('UPDATE mc_jobs SET workspace=? WHERE id=?',(str(racine),job))
  journal(c,job,'créé · agent %s · modèle %s'%(a['name'],modele))
  audit(c,p,'job_created',{'id':job,'agent':a['id'],'title':titre})
@@ -405,7 +427,20 @@ def job_tester(c,p,i,d):
   raise ValueError('On ne teste pas un travail non appliqué (statut '+j['status']+')')
  if not j['workspace']:raise ValueError('Workspace absent')
  racine=Path(j['workspace'])
- resultat=mc_agent.executer_commande(racine,required_text(d,'command',40),d.get('file'))
+ commande=required_text(d,'command',40)
+ fichier=d.get('file')
+ if commande in ('py_compile','node_check'):
+  fichier=required_text(d,'file',500)
+  cible=mc_agent.chemin_sur(racine,fichier)
+  if not cible.is_file():raise ValueError('Le fichier à vérifier doit exister dans le workspace')
+ elif commande=='unittest':
+  tests=list(racine.rglob('test*.py'))+list(racine.rglob('*_test.py'))
+  if not tests:raise ValueError('Aucun fichier de test trouvé dans le workspace')
+  if fichier is not None and mc_agent.chemin_sur(racine,fichier) not in tests:raise ValueError('Le fichier fourni n’est pas un fichier de test du workspace')
+ resultat=mc_agent.executer_commande(racine,commande,fichier)
+ if commande=='unittest' and resultat['exit_code']==0 and not re.search(r'Ran\s+[1-9]\d*\s+tests?',resultat.get('stdout','')+'\n'+resultat.get('stderr','')):
+  resultat['exit_code']=2
+  resultat['stderr']=(resultat.get('stderr','')+'\nAucun test exécuté : preuve refusée').strip()
  resultat['at']=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
  resultat['job_id']=j['id']
  preuve=json.dumps(resultat,ensure_ascii=False)
@@ -447,10 +482,26 @@ def job_valider(c,p,d):
  except ValueError:preuve={}
  if preuve.get('exit_code')!=0:
   raise ValueError('Aucun test réussi enregistré : lance d’abord « Lancer les tests »')
- revues=rows(c,'SELECT kind,verdict FROM mc_reviews WHERE job_id=?',(j['id'],))
- if not revues:raise ValueError('Aucune revue enregistrée : demande une revue avant de valider')
+ # A self-contained green test is not proof of a delivered change.
+ # Only a proposed, non-test source file may unlock final validation.
+ try:proposition=json.loads(j['proposal'] or '{}')
+ except (ValueError,TypeError):proposition={}
+ sources=[]
+ for fichier in proposition.get('files',[]):
+  if not isinstance(fichier,dict):continue
+  chemin=Path(str(fichier.get('path') or ''))
+  morceaux={part.lower() for part in chemin.parts}
+  nom=chemin.stem.lower()
+  if chemin.suffix.lower() not in ('.py','.js','.mjs','.jsx','.ts','.tsx','.html','.css','.sql'):continue
+  if morceaux.intersection({'test','tests','__tests__'}) or nom.startswith('test_') or nom.endswith('_test'):continue
+  if len(str(fichier.get('content') or '').strip())>=16:sources.append(str(chemin))
+ if not sources:
+  raise ValueError('Validation refusée : aucune source développée hors fichiers de tests dans la proposition')
+ revues=rows(c,'SELECT kind,verdict,agent_id FROM mc_reviews WHERE job_id=?',(j['id'],))
  mauvaises=[r['kind'] for r in revues if r['verdict']!='ok']
  if mauvaises:raise ValueError('Revue(s) en échec : '+', '.join(mauvaises))
+ if not any(r['kind'] in ('code','securite') for r in revues):raise ValueError('Aucune revue de code enregistrée')
+ if not any(r['kind']=='tests' and r['agent_id'] is None for r in revues):raise ValueError('Une revue humaine des tests est requise avant validation')
  maintenant=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
  c.execute("UPDATE mc_jobs SET status='completed',finished_at=CURRENT_TIMESTAMP WHERE id=?",(j['id'],))
  journal(c,j['id'],'validé : tests verts et revues favorables')
@@ -697,7 +748,7 @@ def charge_agents(c,p):
 
 # --- P7 : application, reglages, recherche, sauvegardes ----------------------
 SERVEUR=[None]
-VERSION='2.2.0'
+VERSION='2.5.3'
 MAX_TEXTE=200000
 MAX_PREUVE=8000
 ADMIN_TOKEN=os.environ.get('MC_ADMIN_TOKEN') or secrets.token_urlsafe(24)
@@ -708,22 +759,27 @@ REGLAGES_DEFAUT={'ollama_url':'http://127.0.0.1:11434/api/chat','ollama_model':'
 
 def reglages(c,p):
  valeurs=dict(REGLAGES_DEFAUT)
+ valeurs['workspace_dir']=str(mc_agent.WORKSPACES)
  for ligne in rows(c,'SELECT key,value FROM mc_settings WHERE project_id=?',(p,)):valeurs[ligne['key']]=ligne['value']
  return valeurs
 
 def reglage_definir(c,p,d):
  cle=required_text(d,'key',40)
  if cle not in REGLAGES_DEFAUT:raise ValueError('Réglage inconnu : '+cle)
- valeur=str(d.get('value','')).strip()[:300]
- c.execute('INSERT INTO mc_settings(project_id,key,value) VALUES(?,?,?) ON CONFLICT(project_id,key) DO UPDATE SET value=excluded.value',(p,cle,valeur))
- if cle=='ollama_url' and valeur:mc_agent.OLLAMA=valeur
- if cle=='max_jobs':os.environ['MC_MAX_JOBS']=valeur
+ valeur=str(d.get('value','')).strip()[:1024]
  if cle=='workspace_dir':
   if not valeur:raise ValueError('Le dossier des workspaces ne peut pas être vide')
   cible=Path(valeur).expanduser()
   if not cible.is_absolute():raise ValueError('Le dossier des workspaces doit être un chemin absolu')
+  if os.name=='nt' and (not cible.drive or cible.drive.rstrip(':').upper() not in ('C','D')):
+   raise ValueError('Choisis un dossier sur le disque C: ou D:')
+  if os.name=='nt' and len(cible.parts)<2:raise ValueError('Choisis un sous-dossier sur C: ou D:, pas la racine du disque')
   cible.mkdir(parents=True,exist_ok=True)
-  mc_agent.WORKSPACES=cible.resolve()
+  if not cible.is_dir():raise ValueError('Le chemin choisi n’est pas un dossier')
+  valeur=str(cible.resolve())
+ c.execute('INSERT INTO mc_settings(project_id,key,value) VALUES(?,?,?) ON CONFLICT(project_id,key) DO UPDATE SET value=excluded.value',(p,cle,valeur))
+ if cle=='ollama_url' and valeur:mc_agent.OLLAMA=valeur
+ if cle=='max_jobs':os.environ['MC_MAX_JOBS']=valeur
  audit(c,p,'setting_changed',{'key':cle});return {'key':cle,'value':valeur}
 
 def rechercher(c,p,q):
@@ -752,7 +808,8 @@ def historique(c,p,limite=80):
 def sauvegardes_disponibles():
  base=ROOT/'backups'
  if not base.exists():return []
- return [{'nom':f.name,'octets':f.stat().st_size,'quand':datetime.datetime.fromtimestamp(f.stat().st_mtime).isoformat(timespec='seconds')}
+ return [{'nom':f.name,'octets':f.stat().st_size,'quand':datetime.datetime.fromtimestamp(f.stat().st_mtime).isoformat(timespec='seconds'),
+          'fichiers_importes':f.with_suffix('.imports.zip').is_file()}
   for f in sorted(base.glob('*.sqlite3'),key=lambda x:x.stat().st_mtime,reverse=True)[:30]]
 
 def restaurer_sauvegarde(c,p,d):
@@ -761,13 +818,17 @@ def restaurer_sauvegarde(c,p,d):
  source=(base/nom).resolve()
  if source.parent!=base or not source.exists():
   raise ValueError('Sauvegarde introuvable dans backups/ : '+nom)
- securite=sauvegarder(ROOT/'backups'/('bm318d-avant-restauration-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'.sqlite3'))
+ securite=sauvegarder(ROOT/'backups'/('bm318d-avant-restauration-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'.sqlite3'),inclure_imports=False)
+ archive=source.with_suffix('.imports.zip')
+ # Validate ZIP content and local conflicts before replacing the database.
+ fichiers=mc_documents.restore_imports(source,archive)
  origine=sqlite3.connect(source);cible=sqlite3.connect(DB)
  try:origine.backup(cible)
  finally:cible.close();origine.close()
  init()  # Reapply additive migrations when restoring a pre-V2.2 database.
- audit(c,p,'database_restored',{'file':nom,'sauvegarde_prealable':securite.name})
- return {'ok':True,'sauvegarde_prealable':securite.name}
+ audit(c,p,'database_restored',{'file':nom,'sauvegarde_prealable':securite.name,'fichiers_restaures':fichiers})
+ return {'ok':True,'sauvegarde_prealable':securite.name,'fichiers_restaures':fichiers,
+         'avertissement':None if archive.is_file() else 'Sauvegarde ancienne sans archive de fichiers importés'}
 
 def demander_arret():
  threading.Thread(target=lambda: SERVEUR[0] and SERVEUR[0].shutdown(),daemon=True).start()
@@ -776,7 +837,9 @@ def demander_arret():
 def rotation_sauvegardes(limite=10):
  base=ROOT/'backups'
  vieux=sorted(base.glob('bm318d-auto-*.sqlite3'),key=lambda x:x.stat().st_mtime,reverse=True)[limite:]
- for fichier in vieux:fichier.unlink(missing_ok=True)
+ for fichier in vieux:
+  fichier.unlink(missing_ok=True)
+  fichier.with_suffix('.imports.zip').unlink(missing_ok=True)
  return len(vieux)
 
 def boucle_sauvegardes(minutes):
@@ -791,7 +854,9 @@ def boucle_sauvegardes(minutes):
 
 def _dispatch(c,path,d):
  mc_security.authorize_route(c,path,d)
- p=int(d.get('project',0));project(c,p)
+ p=int(d.get('project',0))
+ if path not in ('/api/mc/shutdown','/api/mc/backups','/api/mc/security/revoke'):
+  project(c,p)
  if path=='/api/mc/security/token':
   a=agent(c,p,int(d['agent_id']))
   if a['status']=='archived':raise ValueError('Agent archivé')
@@ -800,6 +865,12 @@ def _dispatch(c,path,d):
   mc_security.revoke(required_text(d,'grant_id',100));return {'revoked':True}
  if path.startswith('/api/mc/connectors/'):
   return mc_connectors.dispatch(c,p,path.rsplit('/',1)[-1],d)
+ if path=='/api/mc/documents/save':return mc_documents.save(c,p,d)
+ if path=='/api/mc/documents/delete':return mc_documents.delete(c,p,d)
+ if path=='/api/mc/documents/import':
+  result=mc_documents.import_file(c,p,d,reglages(c,p).get('workspace_dir'))
+  audit(c,p,'document_imported',{'id':result['item']['id'],'filename':result['item']['title'],'bytes':result['bytes']})
+  return result
  if path=='/api/mc/agent':
   name=required_text(d,'name',100);role=required_text(d,'role',40)
   if not role_valide(c,p,role):raise ValueError('Rôle inconnu')
@@ -1038,9 +1109,16 @@ class Handler(legacy.Handler):
  def _limite_ok(self):
   with LOCK:
    maintenant=time.monotonic()
-   if maintenant-_fenetre[0]>=60:_fenetre[0]=maintenant;_fenetre[1]=0
-   if _fenetre[1]>=LIMITE:return False
-   _fenetre[1]+=1;return True
+   identite=(self.principal.kind,self.principal.agent)
+   route=self.path.split('?',1)[0]
+   cle=(identite,route)
+   debut,compte=_fenetres.get(cle,(maintenant,0))
+   if maintenant-debut>=60:debut,compte=maintenant,0
+   sensibles=('/api/mc/job/run','/api/mc/backup','/api/mc/restore','/api/mc/shutdown')
+   limite=max(3,LIMITE//6) if route in sensibles or route.startswith('/api/mc/connectors/') else LIMITE
+   if compte>=limite:return False
+   _fenetres[cle]=(debut,compte+1)
+   return True
  def _refus(self,code,message):
   b=json.dumps({'error':message},ensure_ascii=False).encode()
   self.send_response(code);self.send_header('Content-Type','application/json; charset=utf-8')
@@ -1066,21 +1144,40 @@ class Handler(legacy.Handler):
   if not self._hote_ok():return self._refus(421,'Hôte non autorisé')
   if self.path=='/':
    html=(ROOT/'BM318d-Railway.html').read_text(encoding='utf-8')
-   html=html.replace('</head>','<meta name="mc-token" content="'+TOKEN+'"><link rel="stylesheet" href="/mission.css"></head>')
-   html=html.replace('</body>','<script src="/mission.js"></script><script src="/security-ui.js"></script><script src="/connectors.js"></script></body>')
+   html=html.replace('</head>','<meta name="mc-token" content="'+TOKEN+'"><link rel="stylesheet" href="/mission.css"><link rel="stylesheet" href="/workspace.css"></head>')
+   html=html.replace('</body>','<script src="/mission.js"></script><script src="/security-ui.js"></script><script src="/connectors.js"></script><script src="/workspace.js"></script></body>')
    b=html.encode()
    self.send_response(200);self.send_header('Content-Type','text/html; charset=utf-8')
    self.send_header('Content-Length',str(len(b)));self.send_header('Cache-Control','no-store')
    self.send_header('X-Content-Type-Options','nosniff');self.send_header('Referrer-Policy','no-referrer')
    self.send_header('Set-Cookie','mc_token='+TOKEN+'; Path=/; HttpOnly; SameSite=Strict')
    self.end_headers();self.wfile.write(b);return
-  if self.path in ('/mission.js','/mission.css','/connectors.js','/security-ui.js'):
+  if self.path in ('/mission.js','/mission.css','/connectors.js','/security-ui.js','/workspace.js','/workspace.css'):
    path=ROOT/self.path[1:];b=path.read_bytes()
    self.send_response(200);self.send_header('Content-Type','text/javascript' if self.path.endswith('.js') else 'text/css')
    self.send_header('Content-Length',str(len(b)));self.send_header('Cache-Control','no-store')
    self.send_header('X-Content-Type-Options','nosniff');self.end_headers();self.wfile.write(b);return
   if self.path.startswith('/api/'):
    if not self._api_autorisee():return
+   if self.path.startswith('/api/mc/documents?'):
+    from urllib.parse import parse_qs,urlsplit
+    try:
+     p=int(parse_qs(urlsplit(self.path).query)['project'][0])
+     with connect() as c:project(c,p);self.reply(mc_documents.items(c,p))
+    except (ValueError,KeyError) as e:self.reply({'error':str(e)},400)
+    return
+   if self.path.startswith('/api/mc/documents/file?'):
+    from urllib.parse import parse_qs,urlsplit,quote
+    try:
+     q=parse_qs(urlsplit(self.path).query);p=int(q['project'][0]);i=int(q['id'][0])
+     with connect() as c:
+      project(c,p);path,name=mc_documents.local_file(c,p,i,reglages(c,p).get('workspace_dir'));body=path.read_bytes()
+     self.send_response(200);self.send_header('Content-Type','application/octet-stream')
+     self.send_header('Content-Disposition',"attachment; filename*=UTF-8''"+quote(name,safe=''))
+     self.send_header('Content-Length',str(len(body)));self.send_header('Cache-Control','no-store')
+     self.send_header('X-Content-Type-Options','nosniff');self.end_headers();self.wfile.write(body)
+    except (ValueError,KeyError,OSError) as e:self.reply({'error':str(e)},404)
+    return
    if self.path.startswith('/api/mc/context?'):
     from urllib.parse import parse_qs,urlsplit
     try:
@@ -1159,8 +1256,9 @@ class Handler(legacy.Handler):
   # des octets non lus fait perdre la reponse au client (RST sous Windows).
   try:n=int(self.headers.get('Content-Length','0'))
   except ValueError:n=0
-  if n<0 or n>16000:
-   self.close_connection=True;return self._refus(400,'Taille invalide')
+  limite=2*1024*1024 if self.path=='/api/ollama' else 12*1024*1024 if self.path=='/api/mc/documents/import' else 16000
+  if n<0 or n>limite:
+   self.close_connection=True;return self._refus(413,'Taille invalide (limite %d octets)'%limite)
   corps=self.rfile.read(n) if n else b''
   if not self._api_autorisee():return
   if not self._limite_ok():return self._refus(429,'Trop de requêtes : patientez une minute')
@@ -1186,6 +1284,8 @@ class Handler(legacy.Handler):
     with LOCK,connect() as c:result=dispatch(c,self.path,d,principal=self.principal)
    self.reply({'ok':True,**result},201)
   except PermissionError as e:self.reply({'error':str(e)},403)
+  except mc_documents.RevisionConflict as e:self.reply({'error':str(e)},409)
+  except FileExistsError as e:self.reply({'error':str(e)},409)
   except (ValueError,KeyError,TypeError,sqlite3.Error) as e:self.reply({'error':str(e)},400)
 if __name__=='__main__':
  import sys

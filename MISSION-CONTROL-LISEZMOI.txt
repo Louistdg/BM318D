@@ -1,9 +1,9 @@
-BM318d MISSION CONTROL - VERSION EXPERIMENTALE
+BM318d Control Center — V2.5.1
 
-Lancement : double-cliquer sur LANCER-MISSION-CONTROL.cmd
+Lancement : double-cliquer sur LANCER-BM318d-RAILWAY.cmd
 Adresse locale : http://127.0.0.1:31880/
 
-Au lancement, Mission Control est l'écran principal. L'ancien canvas, les tâches et le journal restent sous le bouton « Ancien tableau ».
+Le canevas des tâches est l’écran d’accueil; Mission Control et ses agents restent accessibles dans la navigation. La vue d’ensemble affiche les tâches et les agents enregistrés, sans agents fictifs.
 
 1. + Agent : creer des assistants de roles differents, choisir equipe et responsable.
 2. Deplacer les cartes sur le canvas : positions persistantes dans SQLite.
@@ -13,8 +13,8 @@ Au lancement, Mission Control est l'écran principal. L'ancien canvas, les tâch
 6. + Mission : objectif global. + Attribution : tache affectee a un agent.
 7. Missions et preuves : l'écran reprend l'état du serveur.
    Non vérifié, Déclaré, Revu par une personne, Test exécuté, Validé, Refusé.
-   « Validé » n'est pas une case : seul le serveur le pose, après un test réussi et des revues.
-   Une preuve de test se choisit parmi unittest, py_compile et node_check. On ne tape pas de commande.
+   « Validé » n'est pas une case : il faut qu’au moins un test soit réellement exécuté, qu’une revue de code soit enregistrée et qu’un humain confirme la pertinence des résultats.
+   Une preuve se choisit parmi unittest, py_compile et node_check; py_compile et node_check exigent un fichier existant. On ne tape pas de commande arbitraire.
 8. + Contexte : notes de projet, equipe ou agent.
 9. Connexion : liens de communication ou dependance entre agents ; cycles refuses.
 10. + Job : un agent travaille dans un dossier isole (workspaces\p<projet>\a<agent>\job<n>).
@@ -22,7 +22,7 @@ Au lancement, Mission Control est l'écran principal. L'ancien canvas, les tâch
     n'est ecrit avant l'approbation. « Lancer les tests » execute unittest dans ce
     dossier et enregistre la preuve (commande, code de sortie, duree, sortie).
     Commandes autorisees, et seulement celles-la : unittest, py_compile, node_check.
-    Un test reussi fait passer l'attribution en verification « test ».
+    Un test réussi fait passer l’attribution en vérification « test ». Une suite vide ou sans fichier est refusée; la qualité d’un test reste à contrôler par une personne.
 11. + Plan : le modele decoupe un objectif en taches, avec roles et dependances. On
     applique le plan (les jobs sont crees) ou on le refuse. « Orchestrer » lance les
     jobs prets, dans la limite de charge.
@@ -34,8 +34,7 @@ Au lancement, Mission Control est l'écran principal. L'ancien canvas, les tâch
     d'equipe, Maj+clic pour selectionner plusieurs cartes, minimap, « Aligner ».
 14. Controle qualite (P5) : sur un job applique, « Audit secu » analyse le diff
     (eval, exec, shell=True, os.system, chemins systeme...), « Revue code » enregistre
-    un verdict et des constats, « Valider » exige un test reussi ET des revues sans
-    probleme, « Commit » cree un commit git dans le workspace, « Rapport » rassemble
+    un verdict et des constats, « Valider » exige un test non vide, une revue de code et une revue humaine des tests; toute revue en échec bloque l’action. « Commit » cree un commit git dans le workspace, « Rapport » rassemble
     diff, preuve, revues et journal.
 15. Equipes (P6) : « + Role » ajoute un role au projet ; « Recruter » cree une demande
     qui ne devient un agent qu'apres acceptation ; « Dupliquer » et « Archiver » dans
@@ -46,8 +45,8 @@ Au lancement, Mission Control est l'écran principal. L'ancien canvas, les tâch
 16. Application (P7) :
     - lancement sans console : BM318d-Controleur.pyw demarre le serveur si besoin,
       attend qu'il reponde, ouvre le navigateur ; un second lancement n'en cree pas un autre.
-    - arret propre : ARRETER-BM318d.cmd (ou python BM318d-Stop.py) lit le jeton de la
-      page et demande l'arret ; aucun mot de passe stocke.
+    - arrêt propre : ARRETER-BM318d.cmd (ou python BM318d-Stop.py) demande une confirmation administrateur.
+      Limite connue : le jeton est conservé en clair dans logs/admin-token.txt; protéger ce dossier.
     - « Reglages » : adresse Ollama, modele par defaut, jobs simultanes, intervalle de
       sauvegarde automatique (0 = arretee), dossier des workspaces (lecture seule).
     - « Sauvegardes » : liste, sauvegarde immediate, restauration (une sauvegarde de
@@ -73,7 +72,7 @@ Au lancement, Mission Control est l'écran principal. L'ancien canvas, les tâch
       (GetSystemTimes) et, si nvidia-smi existe, de l'utilisation GPU. Quand une mesure
       est indisponible, elle est ignoree, jamais inventee.
 
-IMPORTANT : cette version organise et supervise les assistants mais ne lance PAS encore plusieurs agents autonomes. L'onglet Ollama existant reste une aide de lecture seule. Le transfert de contexte produit un dossier de passation consultable, pas un message automatiquement envoye a un modele. Les permissions de fichiers et l'execution de code ne sont pas activees.
+IMPORTANT : les jobs peuvent proposer des changements dans leur workspace isolé; aucune écriture ne se fait avant approbation. Le sandbox WSL est validé par des tests OS, tandis que MCP reste verrouillé. Les revues automatiques de sécurité sont des filtres de motifs, pas une certification. Les tests écrits dans un workspace doivent être examinés par une personne avant validation.
 
 SECURITE (ajoute le 18/10) :
 - Le serveur genere un jeton de session a chaque demarrage, l'injecte dans la page
@@ -83,7 +82,7 @@ SECURITE (ajoute le 18/10) :
 - Cela protege des pages web tierces et des requetes aveugles ; cela ne protege pas
   d'un programme local lance par le meme utilisateur. Le serveur reste sur 127.0.0.1.
 
-Base partagee : bm318d.sqlite3
+Base partagee : bm318d.sqlite3 (ne pas remplacer par une base de test)
 Sauvegarde : dossier backups\  (python MissionControl.py --sauvegarde)
 Tests : python test_mission_control.py   (logique)
         python test_http.py              (integration HTTP, base temporaire)

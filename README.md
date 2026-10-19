@@ -1,6 +1,13 @@
 # BM318D — Control Center
 
-BM318D is a local-first Windows control center for organizing projects, AI agents, missions, assignments, and their evidence. The repository contains the Python desktop/server application, the Mission Control web interface, AI-provider and MCP connector code, security/sandbox modules, installer scripts, and automated tests.
+**Version 2.5.3 — 19/10/2026.** Nom public du produit : **DIOPTRE**.
+Ce depot contient la source complete de l'application Windows : service Python
+local, interface Mission Control, connecteurs IA, bac a sable, tests.
+
+BM318D is a local-first Windows control center for organizing projects, AI agents,
+missions, assignments, and their evidence. The repository contains the Python
+desktop/server application, the Mission Control web interface, AI-provider and MCP
+connector code, security/sandbox modules, installer scripts, and automated tests.
 
 ## Project at a glance
 
@@ -9,27 +16,41 @@ BM318D is a local-first Windows control center for organizing projects, AI agent
 - **AI support:** local Ollama and compatible provider integrations, per-agent assignments, quotas/fallback behavior, and connector management.
 - **Security work:** route authorization, isolated workspaces, sandbox backends, permission checks, and tests.
 
-This repository is a reviewed source snapshot, not a deployment package. Local databases, credentials, backups, logs, and personal handoff notes are intentionally excluded. Do not add them to Git.
+## Audit pack
 
-## Start here
+`AUDIT/00-LIRE-EN-PREMIER.md` describes what to audit, by priority, and lists the
+known limitations so they are not reported as findings.
+`AUDIT/01-COMMENT-TESTER.md` gives the exact commands and expected results.
 
-1. Read this file and [`docs/SECURITY-STATUS.md`](docs/SECURITY-STATUS.md).
-2. Read [`MISSION-CONTROL-LISEZMOI.txt`](MISSION-CONTROL-LISEZMOI.txt) for the product flows described by the project.
-3. Read [`GROK-MISSION-01-PRODUCT-AUDIT.md`](GROK-MISSION-01-PRODUCT-AUDIT.md) for the initial read-only design and interaction review.
-4. The principal UI files are `BM318d-Railway.html`, `mission.js`, `mission.css`, and `connectors.js`; server behavior is implemented mainly in `MissionControl.py`, `BM318d-WebServer.py`, `mc_agent.py`, and `mc_connectors.py`.
+## Version history (recent)
 
-## Local development
+- **2.5.3** — explicit revision errors, deleted documents moved to a `corbeille`
+  folder, backups timestamped to the microsecond.
+- **2.5.2** — restoring over a locally modified file now answers **HTTP 409**
+  with a JSON message instead of dropping the connection.
+- **2.5.1** — import/restore of documents with a ZIP archive of uploaded files.
 
-Use a disposable copy and temporary databases for tests. Review the command and environment before running scripts; do not point tests at a real user database or a live service. The individual test files document their fixtures and can be run with Python or Node where applicable.
+## Security model, in one screen
 
-## Collaboration
+- session token in an HttpOnly cookie plus `X-MC-Token` header;
+- separate administrator token (`X-MC-Admin`) for sensitive routes;
+- host and origin checks, body size and rate limits;
+- Windows sandbox (restricted token, low integrity, job object) for job execution;
+- MCP discovery locked by default.
 
-The initial discovery review is recorded in `GROK-MISSION-01-PRODUCT-AUDIT.md`. Implementation now proceeds on feature branches with pull requests and test evidence. See [`docs/DELIVERY-V24.md`](docs/DELIVERY-V24.md) for the integrated changes, verification and local installation model.
+Known limits: sandbox is Windows-only, file reads outside the workspace are not
+confined, the sandboxed child network is not filtered, SQLite is single-file.
 
-## Parcours
+## Quick start
 
-Mission Control is the screen a new user lands on. `LANCER-MISSION-CONTROL.cmd` and `LANCER-BM318d-RAILWAY.cmd` both start the authenticated local service (port 31880). The Railway launcher no longer starts the older unauthenticated server.
+```cmd
+set MC_DB=%TEMP%\bm318d.sqlite3
+C:\Python314\python.exe MissionControl.py
+```
 
-The previous canvas, task list and journal stay available from the **Ancien tableau** button. Their code and data are not removed.
+Then open http://127.0.0.1:31880/ — the session token is in the page, the
+administrator token is written next to the database in `logs/admin-token.txt`.
 
-`OUVRIR-BM318d.cmd` only opens a local `index.html` export when that file exists beside the scripts. It does not start the service. The other `LANCER-*.cmd` files still open the older desktop windows (Studio, Unifié, Extensions, `BM318d.pyw`).
+This repository is a reviewed source snapshot, not a deployment package. Local
+databases, credentials, backups, logs, and personal handoff notes are
+intentionally excluded. Do not add them to Git.

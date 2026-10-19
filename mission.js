@@ -55,7 +55,8 @@ function remplirActeurs(){
 }
 async function agirSurJob(id,action){
  try{
-  if(action==='review_secu'){const r=await post('review',{job_id:id,agent_id:acteurId(),kind:'securite'});toast(r.verdict==='ok'?'Audit sécurité : rien à signaler':('Audit sécurité : '+r.findings.length+' constat(s)'))}
+  if(action==='review_tests'){if(!confirm('Confirme que tu as examiné les résultats des tests et qu’ils vérifient bien le changement ?'))return;await post('review',{job_id:id,kind:'tests',verdict:'ok',findings:['Résultats examinés et jugés pertinents par l’opérateur']});toast('Revue humaine des tests enregistrée')}
+  else if(action==='review_secu'){const r=await post('review',{job_id:id,agent_id:acteurId(),kind:'securite'});toast(r.verdict==='ok'?'Audit sécurité : rien à signaler':('Audit sécurité : '+r.findings.length+' constat(s)'))}
   else{await post('job/'+action,{id,agent_id:acteurId()});toast('Job : '+action)}
   await refresh()
  }catch(e){toast(e.message)}
@@ -96,11 +97,8 @@ function createLink(){
  if(data.agents.length<2){toast('Il faut au moins deux agents');return}
  modal('Relier deux agents','<label>Source</label><select id="mcSource">'+agentOptions(false)+'</select><label>Destination</label><select id="mcTarget">'+agentOptions(false)+'</select><label>Type de connexion</label><select id="mcKind"><option value="communication">Communication</option><option value="dependency">Dépendance</option></select>',()=>post('link',{source_id:Number($('mcSource').value),target_id:Number($('mcTarget').value),kind:$('mcKind').value}))}
 const nav=document.querySelector('.rail');
-const button=document.createElement('button');button.type='button';button.textContent='MC';button.title='Mission Control';button.setAttribute('aria-label','Mission Control');button.dataset.page='mission';button.onclick=()=>open();
+const button=document.createElement('button');button.type='button';button.textContent='◎';button.title='Mission Control';button.setAttribute('aria-label','Mission Control');button.dataset.page='mission';button.onclick=()=>open();
 const logo=nav.querySelector('.logo');nav.insertBefore(button,logo?logo.nextSibling:nav.firstChild);
-const ancien=document.createElement('button');ancien.type='button';ancien.id='ancienTableau';ancien.textContent='Ancien tableau';ancien.title="Canvas, tâches et journal d'origine";
-ancien.onclick=()=>{nav.classList.add('legacy-open');document.body.classList.add('legacy-page');window.mcPage='legacy';const cible=nav.querySelector('button[data-page="canvas"]');if(cible)cible.click();};
-const spacer=document.querySelector('.header .spacer');if(spacer)spacer.before(ancien);else document.querySelector('.header').append(ancien);
 const section=document.createElement('section');section.id='mission';section.className='view';
 section.innerHTML='<div class="mc-toolbar"><strong>Mission Control</strong><label title="Indique quel agent est cité dans l\'action. Ce n\'est pas une connexion.">Attribuer l\'action à</label><select id="mcActeur" aria-label="Attribuer l\'action à"></select><div class="mc-modes" role="tablist"><button type="button" class="active" data-groupe="equipe" aria-pressed="true">Équipe</button><button type="button" data-groupe="travail" aria-pressed="false">Travail</button><button type="button" data-groupe="decisions" aria-pressed="false">Décisions</button><button type="button" data-groupe="compte" aria-pressed="false">Compte</button></div><div class="mc-groupe" data-groupe="equipe"><button id="mcAdd" type="button">＋ Agent</button><button id="mcRol" type="button">＋ Rôle</button><button id="mcRecrute" type="button">Recruter</button><button id="mcLink" type="button">↗ Connexion</button><button id="mcAligner" type="button">Aligner</button></div><div class="mc-groupe" data-groupe="travail" hidden><button id="mcMission" type="button">＋ Mission</button><button id="mcAssign" type="button">＋ Attribution</button><button id="mcJob" type="button">＋ Job</button><button id="mcBranche" type="button">＋ Branche</button><button id="mcPlan" type="button" title="Demander un découpage en tâches. Rien n\'est créé avant accord.">Proposer un plan</button><button id="mcOrchestrer" type="button">Orchestrer</button><button id="mcNote" type="button">＋ Contexte</button></div><div class="mc-groupe" data-groupe="decisions" hidden><button id="mcDecision" type="button">＋ Décision</button><button id="mcDecisionsVue" type="button">Propositions</button><button id="mcCharge" type="button">Charge</button><button id="mcPerm" type="button">Permissions</button></div><div class="mc-groupe" data-groupe="compte" hidden><button id="mcReglages" type="button">Réglages</button><button id="mcSauvegardes" type="button">Sauvegardes</button><button id="mcConnecteurs" type="button">Connecteurs</button><input id="mcRecherche" aria-label="Rechercher" placeholder="Rechercher (2 lettres min.)"><button id="mcNotif" type="button" title="Notifications" aria-label="Notifications">●</button></div><div style="flex:1"></div><button id="mcSwitch" type="button">Missions & preuves</button><button id="mcRefresh" type="button" aria-label="Actualiser">↻</button></div><div class="mc-stage" id="mcStage"><div class="mc-world" id="mcWorld"><div class="mc-zones" id="mcZones"></div><svg class="mc-links" id="mcLinks"></svg><div id="mcNodes"></div></div><div class="mc-minimap"><canvas id="mcMinimapCanvas" width="200" height="120"></canvas></div><div class="mc-legend">Déplacer : glisser · Maj+clic : sélection · Déposer sur une zone : changer d\'équipe · Violet : hiérarchie · Vert : communication · Orange : dépendance</div><aside class="mc-side" id="mcDetails" style="display:none"></aside></div><div id="mcRecords" class="dash" style="display:none;overflow:auto"></div>';
 document.querySelector('.main').appendChild(section);
@@ -146,13 +144,14 @@ async function ouvrirReglages(){
   const r=await fetch('/api/mc/settings?project='+getProject(),{headers:entetes()});
   if(!r.ok)throw Error('Réglages indisponibles');
   const s=await r.json();
-  modal('Réglages','<p class="subtle">Le jeton administrateur reste dans logs\\admin-token.txt sur cette machine. Le serveur ne le renvoie pas. Saisi ici, il reste seulement en mémoire pour cette page.</p><label>Jeton administrateur</label><input id="mcSetAdmin" type="password" autocomplete="current-password" placeholder="'+(jetonAdmin?'déjà en mémoire pour cette page':'coller le jeton local')+'"><p class="subtle">Les réglages sont enregistrés par projet. Le port et le dossier des workspaces demandent un redémarrage.</p>'
+  modal('Réglages','<p class="subtle">Le jeton administrateur reste dans logs\\admin-token.txt sur cette machine. Le serveur ne le renvoie pas. Saisi ici, il reste seulement en mémoire pour cette page.</p><label>Jeton administrateur</label><input id="mcSetAdmin" type="password" autocomplete="current-password" placeholder="'+(jetonAdmin?'déjà en mémoire pour cette page':'coller le jeton local')+'"><p class="subtle">Ces réglages s’appliquent au projet sélectionné. Chaque projet peut utiliser son propre dossier local ; ses travaux y sont rangés dans des sous-dossiers.</p>'
    +'<label>Adresse Ollama</label><input id="mcSetUrl" value="'+esc(s.ollama_url)+'">'
    +'<label>Modèle par défaut</label><input id="mcSetModel" value="'+esc(s.ollama_model)+'">'
    +'<label>Jobs simultanés (vide = selon la mémoire)</label><input id="mcSetJobs" value="'+esc(s.max_jobs)+'">'
    +'<label>Sauvegarde automatique (minutes, 0 = arrêtée)</label><input id="mcSetBackup" value="'+esc(s.auto_backup_minutes)+'">'
-   +'<label>Dossier des workspaces</label><input value="'+esc(s.workspace_dir)+'" disabled>',async()=>{
+   +'<label>Dossier local du projet (disque C: ou D:)</label><input id="mcSetWorkspace" value="'+esc(s.workspace_dir)+'" maxlength="1024" autocomplete="off"><p class="subtle">BM318d créera ici les dossiers du projet et de ses travaux. Les imports seront copiés dans cet espace ; l’original restera à son emplacement.</p><p class="subtle"><strong>À savoir :</strong> les sauvegardes BM318d couvrent la base SQLite, pas les fichiers importés. Inclue aussi ce dossier dans tes sauvegardes personnelles.</p>',async()=>{
     const saisi=$('mcSetAdmin').value.trim();if(saisi)memoriserJeton(saisi);
+    await post('settings',{key:'workspace_dir',value:$('mcSetWorkspace').value});
     await post('settings',{key:'ollama_url',value:$('mcSetUrl').value});
     await post('settings',{key:'ollama_model',value:$('mcSetModel').value});
     await post('settings',{key:'max_jobs',value:$('mcSetJobs').value});
@@ -367,7 +366,7 @@ function renderRecords(){
   if(j.status==='paused')actions.push(['resume','Reprendre'],['reject','Refuser']);
   if(j.status==='proposed')actions.push(['approve','Approuver'],['pause','Pause'],['reject','Refuser'],['diff','Voir le diff']);
   if(j.status==='approved')actions.push(['test','Lancer les tests'],['diff','Voir le diff']);
-  if(j.status==='approved'||j.status==='completed')actions.push(['review_secu','Audit sécu'],['review_code','Revue code'],['validate','Valider'],['commit','Commit'],['report','Rapport']);
+  if(j.status==='approved'||j.status==='completed')actions.push(['review_secu','Audit sécu'],['review_code','Revue code'],['review_tests','Revue tests (humaine)'],['validate','Valider'],['commit','Commit'],['report','Rapport']);
   return '<div class="mc-record"><b>'+esc(j.title)+'</b> · '+esc(nom)+'<p>'+esc(j.task)+'</p><small>'+esc(j.status)+(j.error?' — '+esc(j.error):'')+' · modèle '+esc(j.model)+' · '+esc(libellePreuve((data.assignments.find(x=>x.id===j.assignment_id)||{}).verification||'none'))+'</small><p class="subtle">Approuver écrit la proposition dans le dossier isolé. Valider exige un test réussi et des revues. Commit écrit un commit git, à part.</p><p>'+actions.map(x=>'<button data-job="'+j.id+'" data-action="'+x[0]+'">'+esc(x[1])+'</button>').join(' ')+'</p><details><summary>Journal</summary><pre style="white-space:pre-wrap">'+esc(j.log||'—')+'</pre></details></div>';
  }).join('');
  const plans=(data.plans||[]).map(p=>'<div class="mc-record"><b>'+esc(p.objective)+'</b><small>'+esc(p.status)+' · '+esc(p.created_at)+'</small>'+(p.status==='proposed'?'<p><button data-plan="'+p.id+'">Appliquer</button></p>':'')+'</div>').join('');
@@ -420,7 +419,7 @@ let essaisProjet=0;
 function demarrerMission(){
  essaisProjet++;
  if(!getProject()&&essaisProjet<40){setTimeout(demarrerMission,50);return;}
- open();
+ window.mcPage='legacy';nav.classList.add('legacy-open');document.body.classList.add('legacy-page');showPage('canvas');
 }
 demarrerMission();
 })();

@@ -156,8 +156,8 @@ try {
   await c.evaluate(`(() => {
     window.__vraiFetch = window.__vraiFetch || window.fetch;
     window.fetch = (url, opts) => String(url).includes('/api/ollama')
-      ? Promise.resolve(new Response(JSON.stringify({ok: true, answer: 'Reponse de test'}),
-          {status: 200, headers: {'Content-Type': 'application/json'}}))
+      ? (window.__chatPayload = JSON.parse(opts.body), Promise.resolve(new Response(JSON.stringify({ok: true, answer: 'Reponse de test'}),
+          {status: 200, headers: {'Content-Type': 'application/json'}})))
       : window.__vraiFetch(url, opts);
   })()`);
   const avant = await c.evaluate(`document.querySelectorAll('#chatlog .msg').length`);
@@ -165,6 +165,8 @@ try {
   await sleep(900);
   const apres = await c.evaluate(`document.querySelectorAll('#chatlog .msg').length`);
   t('le message et la reponse sont ajoutes', apres === avant + 2, {avant, apres});
+  t('le contexte envoyé contient les tours précédents et le message actuel', await c.evaluate(`window.__chatPayload.history.some(m => m.content === 'Bonjour') && window.__chatPayload.history.at(-1).role === 'user'`));
+  t('le message n’est pas dupliqué hors de l’historique', await c.evaluate(`window.__chatPayload.prompt === ''`));
   t('le message de l’utilisateur est a droite', await c.evaluate(`(() => {
     const msgs = [...document.querySelectorAll('#chatlog .msg')];
     const u = msgs[msgs.length - 2], r = msgs[msgs.length - 1];

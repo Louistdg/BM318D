@@ -22,7 +22,7 @@ TAILLE_MAX = 200_000          # octets par fichier proposé
 FICHIERS_MAX = 20             # fichiers par proposition
 DELAI_COMMANDE = 60           # secondes
 DELAI_OLLAMA = int(os.environ.get('MC_OLLAMA_TIMEOUT') or 300)
-BUDGET_OLLAMA = int(os.environ.get('MC_OLLAMA_BUDGET') or 600)
+BUDGET_OLLAMA = max(128, min(8192, int(os.environ.get('MC_OLLAMA_BUDGET') or 4000)))
 OLLAMA = 'http://127.0.0.1:11434/api/chat'
 
 # Liste fermée. Une commande = un exécutable et des arguments fixes ; le seul
@@ -38,8 +38,9 @@ class Refus(Exception):
     """Opération refusée par les règles de sécurité du workspace."""
 
 
-def racine_workspace(projet, agent, job):
-    base = (WORKSPACES / ('p%d' % projet) / ('a%d' % agent) / ('job%d' % job))
+def racine_workspace(projet, agent, job, racine=None):
+    racine = Path(racine) if racine is not None else WORKSPACES
+    base = (racine / ('p%d' % projet) / ('a%d' % agent) / ('job%d' % job))
     base.mkdir(parents=True, exist_ok=True)
     return base.resolve()
 
@@ -210,6 +211,9 @@ def analyser_diff(diff):
         (r'/etc/(?:passwd|shadow)', 'accès à un fichier système'),
         (r'\.\./\.\.', 'remontée de répertoires'),
         (r'requests\.(?:get|post)\s*\(\s*["\']http://', 'appel HTTP en clair'),
+        (r'\.innerHTML\s*=', 'affectation innerHTML à vérifier contre une injection DOM'),
+        (r'\bchild_process\b', 'module Node.js de lancement de processus'),
+        (r'\b(?:execSync|spawnSync)\s*\(', 'lancement synchrone de processus Node.js'),
     ]
     constats = []
     fichier = ''
@@ -243,7 +247,7 @@ def commit_git(racine, message):
 def generer_ollama(modele, systeme, tache, contexte, delai=None, budget=None):
     """Un seul appel, non streamé, avec budget de tokens et délai bornés."""
     delai = delai or DELAI_OLLAMA
-    budget = budget or BUDGET_OLLAMA
+    budget = max(128, min(8192, int(budget or BUDGET_OLLAMA)))
     messages = [{'role': 'system', 'content': systeme},
                 {'role': 'user', 'content': tache + '\n\nContexte:\n' + contexte}]
     charge = json.dumps({'model': modele, 'stream': False, 'format': 'json',
