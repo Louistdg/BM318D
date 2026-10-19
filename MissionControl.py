@@ -8,6 +8,7 @@ import mc_security
 import mc_documents
 import mc_legacy
 import mc_backups
+import mc_missions
 import contextvars,functools,inspect
 ROOT=Path(__file__).resolve().parent
 # Base et port surchargeables : les tests d'integration tournent sur une copie
@@ -922,123 +923,15 @@ def _dispatch(c,path,d):
   if not updates:raise ValueError('Aucun changement')
   c.execute('UPDATE mc_agents SET '+','.join(k+'=?' for k in updates)+' WHERE id=?',(*updates.values(),i))
   audit(c,p,'agent_updated',{'id':i,'changes':updates});return {'id':i}
- if path=='/api/mc/link':
-  a=int(d['source_id']);b=int(d['target_id']);kind=required_text(d,'kind',30)
-  if a==b or kind not in ('communication','dependency'):raise ValueError('Lien invalide')
-  agent(c,p,a);agent(c,p,b)
-  if kind=='dependency':
-   graph={}
-   for r in rows(c,"SELECT source_id,target_id FROM mc_links WHERE project_id=? AND kind='dependency'",(p,)):graph.setdefault(r['source_id'],[]).append(r['target_id'])
-   todo=[b];seen=set()
-   while todo:
-    x=todo.pop()
-    if x==a:raise ValueError('Dépendance circulaire refusée')
-    if x not in seen:seen.add(x);todo+=graph.get(x,[])
-  c.execute('INSERT OR IGNORE INTO mc_links(project_id,source_id,target_id,kind) VALUES(?,?,?,?)',(p,a,b,kind))
-  audit(c,p,'link_created',{'from':a,'to':b,'kind':kind});return {'ok':True}
- if path=='/api/mc/mission':
-  title=required_text(d,'title',160);objective=required_text(d,'objective',5000)
-  cur=c.execute('INSERT INTO mc_missions(project_id,title,objective) VALUES(?,?,?)',(p,title,objective))
-  audit(c,p,'mission_created',{'id':cur.lastrowid});return {'id':cur.lastrowid}
- if path=='/api/mc/assignment':
-  m=one(c,'SELECT * FROM mc_missions WHERE project_id=? AND id=?',(p,int(d['mission_id'])))
-  a=agent(c,p,int(d['agent_id']));task=required_text(d,'task',2000)
-  cur=c.execute('INSERT INTO mc_assignments(mission_id,agent_id,task) VALUES(?,?,?)',(m['id'],a['id'],task))
-  audit(c,p,'assignment_created',{'id':cur.lastrowid,'agent':a['id']});return {'id':cur.lastrowid}
- if path=='/api/mc/assignment/update':
-  a=one(c,'SELECT a.* FROM mc_assignments a JOIN mc_missions m ON a.mission_id=m.id WHERE a.id=? AND m.project_id=?',(int(d['id']),p))
-  status=d.get('status',a['status'])
-  if status not in ('queued','working','blocked','done','reviewed'):raise ValueError('Statut invalide')
-  result=str(d.get('result',a['result']))[:8000]
-  # Trois niveaux distincts, et une preuve obligatoire pour le troisieme :
-  # declared = on affirme ; human = un humain a relu ; test = une commande a
-  # reellement tourne, avec son code de sortie.
-  verification=a['verification']
-  if 'verification' in d:verification=str(d['verification'])
-  elif d.get('verified') is True:verification='human' if status=='reviewed' else a['verification']
-  if verification not in ('none','declared','human','test','approved','validated'):raise ValueError('Niveau de vérification inconnu')
-  if verification in ('validated','approved'):
-   raise ValueError('Validation refusée : seul le serveur peut valider après un test exécuté et des revues')
-  if verification in ('human','test','approved','validated') and status not in ('done','reviewed'):raise ValueError('On ne vérifie pas un travail encore en cours')
-  evidence=a['evidence']
-  if verification=='test':
-   if 'evidence' not in d or not isinstance(d['evidence'],dict):raise ValueError('Preuve invalide')
-   prouve=d['evidence']
-   if not str(prouve.get('command','')).strip() or not isinstance(prouve.get('exit_code'),int):
-    raise ValueError('Preuve de test incomplète : commande et code de sortie (entier) requis')
-   identifiant_job=prouve.get('job_id')
-   if not isinstance(identifiant_job,int):
-    raise ValueError('Preuve refusée : elle doit citer le job (job_id) qui l’a produite')
-   job_source=one(c,'SELECT * FROM mc_jobs WHERE project_id=? AND id=?',(p,identifiant_job))
-   if job_source['status'] not in ('approved','completed'):
-    raise ValueError('Preuve refusée : le job '+str(identifiant_job)+' n’est pas appliqué')
-   if job_source['assignment_id'] not in (None,a['id']):
-    raise ValueError('Preuve refusée : elle appartient à une autre attribution')
-   try:stockee=json.loads(job_source['evidence'] or '{}')
-   except ValueError:stockee={}
-   if stockee.get('command')!=prouve.get('command') or stockee.get('exit_code')!=prouve.get('exit_code') or stockee.get('job_id')!=identifiant_job:
-    raise ValueError('Preuve refusée : commande ou code de sortie différent du test exécuté')
-   if len(job_source['evidence'])>8000:raise ValueError('Preuve exécutée trop volumineuse')
-   evidence=job_source['evidence']
-  elif 'evidence' in d:
-   if not isinstance(d['evidence'],dict):raise ValueError('Preuve invalide')
-   evidence=json.dumps(d['evidence'],ensure_ascii=False)[:8000]
-  verified=1 if verification in ('human','test') else 0
-  verifie_le=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds') if verified else a['verified_at']
-  verifie_par=auteur_preuve() if verified else None
-  c.execute('UPDATE mc_assignments SET status=?,result=?,verified=?,verification=?,evidence=?,verified_at=?,verified_by=? WHERE id=?',(status,result,verified,verification,evidence,verifie_le,verifie_par,a['id']))
-  audit(c,p,'assignment_updated',{'id':a['id'],'status':status,'verification':verification,'verified':verified});return {'ok':True,'verification':verification}
- if path=='/api/mc/note':
-  aid=d.get('agent_id');aid=int(aid) if aid not in ('',None) else None
-  if aid:agent(c,p,aid)
-  scope=d.get('scope','project')
-  if scope not in ('project','team','agent'):raise ValueError('Portée invalide')
-  equipe=str(d.get('team') or '').strip()[:80] or None
-  if scope=='team' and not equipe and aid:equipe=agent(c,p,aid)['team']
-  if scope=='team' and not equipe:raise ValueError('Une note d’équipe demande une équipe')
-  remplasse=d.get('supersedes');remplasse=int(remplasse) if remplasse not in ('',None) else None
-  if remplasse is not None:
-   ancienne=one(c,'SELECT * FROM mc_notes WHERE project_id=? AND id=?',(p,remplasse))
-   if ancienne['scope']!=scope:raise ValueError('On ne remplace pas une note d’une autre portée')
-   if scope=='agent' and ancienne['agent_id']!=aid:raise mc_security.Refus('On ne remplace pas la note privée d’un autre agent')
-   if scope=='team' and ancienne['team']!=equipe:raise mc_security.Refus('On ne remplace pas la note d’une autre équipe')
-  content=required_text(d,'content',4000)
-  cur=c.execute('INSERT INTO mc_notes(project_id,agent_id,scope,team,supersedes,content) VALUES(?,?,?,?,?,?)',(p,aid,scope,equipe,remplasse,content))
-  audit(c,p,'note_created',{'id':cur.lastrowid,'scope':scope,'remplace':remplasse});return {'id':cur.lastrowid}
- if path=='/api/mc/decision':
-  aid=d.get('agent_id');aid=int(aid) if aid not in ('',None) else None
-  if aid:agent(c,p,aid)
-  titre=required_text(d,'title',160);decision=required_text(d,'decision',4000);raison=required_text(d,'rationale',4000)
-  alternative=str(d.get('alternatives',''))[:4000]
-  cur=c.execute('INSERT INTO mc_decisions(project_id,agent_id,title,decision,rationale,alternatives) VALUES(?,?,?,?,?,?)',(p,aid,titre,decision,raison,alternative))
-  audit(c,p,'decision_recorded',{'id':cur.lastrowid,'title':titre});return {'id':cur.lastrowid}
- if path=='/api/mc/message':
-  de=d.get('from_agent');de=int(de) if de not in ('',None) else None
-  vers=d.get('to_agent');vers=int(vers) if vers not in ('',None) else None
-  equipe=str(d.get('to_team') or '').strip()[:80] or None
-  if de:agent(c,p,de)
-  if vers:agent(c,p,vers)
-  if bool(vers)==bool(equipe):raise ValueError('Un message vise un agent ou une équipe, pas les deux ni aucun')
-  corps=required_text(d,'body',4000)
-  cur=c.execute('INSERT INTO mc_messages(project_id,from_agent,to_agent,to_team,body) VALUES(?,?,?,?,?)',(p,de,vers,equipe,corps))
-  audit(c,p,'message_sent',{'id':cur.lastrowid,'vers_agent':vers,'vers_equipe':equipe});return {'id':cur.lastrowid}
- if path=='/api/mc/message/read':
-  j=one(c,'SELECT * FROM mc_messages WHERE project_id=? AND id=?',(p,int(d['id'])))
-  aid=int(d['agent_id']);a=agent(c,p,aid)
-  if not (j['to_agent']==aid or (j['to_team'] and j['to_team']==a['team'])):
-   raise ValueError('Ce message ne te concerne pas')
-  if not j['read_at']:
-   c.execute("UPDATE mc_messages SET read_at=CURRENT_TIMESTAMP WHERE id=?",(j['id'],))
-   audit(c,p,'message_read',{'id':j['id'],'agent':aid})
-  return {'ok':True,'deja_lu':bool(j['read_at'])}
- if path=='/api/mc/handoff/ack':
-  j=one(c,'SELECT * FROM mc_handoffs WHERE project_id=? AND id=?',(p,int(d['id'])))
-  aid=int(d['agent_id']);agent(c,p,aid)
-  if j['new_manager_id']!=aid:raise ValueError('Seul le nouveau responsable peut acquitter cette passation')
-  if j['ack_at']:raise ValueError('Passation déjà acquittée')
-  c.execute("UPDATE mc_handoffs SET ack_at=CURRENT_TIMESTAMP,ack_by=? WHERE id=?",(aid,j['id']))
-  audit(c,p,'handoff_acknowledged',{'id':j['id'],'agent':aid})
-  return {'ok':True}
+ if path=='/api/mc/link':return mc_missions.lien_creer(c,p,d)
+ if path=='/api/mc/mission':return mc_missions.mission_creer(c,p,d)
+ if path=='/api/mc/assignment':return mc_missions.affectation_creer(c,p,d)
+ if path=='/api/mc/assignment/update':return mc_missions.affectation_modifier(c,p,d)
+ if path=='/api/mc/note':return mc_missions.note_creer(c,p,d)
+ if path=='/api/mc/decision':return mc_missions.decision_creer(c,p,d)
+ if path=='/api/mc/message':return mc_missions.message_envoyer(c,p,d)
+ if path=='/api/mc/message/read':return mc_missions.message_lire(c,p,d)
+ if path=='/api/mc/handoff/ack':return mc_missions.handoff_ack(c,p,d)
  if path=='/api/mc/job':return job_creer(c,p,d)
  if path=='/api/mc/job/run':return job_lancer(c,p,int(d['id']))
  if path=='/api/mc/job/pause':return job_pause(c,p,int(d['id']))
