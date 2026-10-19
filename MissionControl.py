@@ -7,6 +7,7 @@ import mc_connectors
 import mc_security
 import mc_documents
 import mc_legacy
+import mc_backups
 import contextvars,functools,inspect
 ROOT=Path(__file__).resolve().parent
 # Base et port surchargeables : les tests d'integration tournent sur une copie
@@ -190,19 +191,7 @@ def init():
   mc_documents.migrate(c)
 
 def sauvegarder(destination=None, *, inclure_imports=True):
- # Copie en ligne (API backup de SQLite) : coherente meme si le serveur ecrit.
- if not DB.is_file():return None
- destination=Path(destination) if destination else ROOT/'backups'/('dioptre-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.sqlite3')
- destination.parent.mkdir(parents=True,exist_ok=True)
- source=sqlite3.connect(DB,timeout=20)
- try:
-  cible=sqlite3.connect(destination)
-  try:source.backup(cible)
-  finally:cible.close()
- finally:source.close()
- if inclure_imports:
-  mc_documents.backup_imports(destination,destination.with_suffix('.imports.zip'))
- return destination
+ return mc_backups.sauvegarder(ROOT,DB,destination,inclure_imports=inclure_imports)
 def rows(c,q,a=()):
  return [dict(r) for r in c.execute(q,a).fetchall()]
 def one(c,q,a=()):
@@ -818,53 +807,17 @@ def historique(c,p,limite=80):
   'jobs':rows(c,'SELECT id,title,status,created_at,finished_at FROM mc_jobs WHERE project_id=? ORDER BY id DESC LIMIT ?',(p,int(limite)))}
 
 def sauvegardes_disponibles():
- base=ROOT/'backups'
- if not base.exists():return []
- return [{'nom':f.name,'octets':f.stat().st_size,'quand':datetime.datetime.fromtimestamp(f.stat().st_mtime).isoformat(timespec='seconds'),
-          'fichiers_importes':f.with_suffix('.imports.zip').is_file()}
-  for f in sorted(base.glob('*.sqlite3'),key=lambda x:x.stat().st_mtime,reverse=True)[:30]]
-
+ return mc_backups.disponibles(ROOT)
 def restaurer_sauvegarde(c,p,d):
- nom=required_text(d,'file',200)
- base=(ROOT/'backups').resolve()
- source=(base/nom).resolve()
- if source.parent!=base or not source.exists():
-  raise ValueError('Sauvegarde introuvable dans backups/ : '+nom)
- securite=sauvegarder(ROOT/'backups'/('dioptre-avant-restauration-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'.sqlite3'),inclure_imports=False)
- archive=source.with_suffix('.imports.zip')
- # Validate ZIP content and local conflicts before replacing the database.
- fichiers=mc_documents.restore_imports(source,archive)
- origine=sqlite3.connect(source);cible=sqlite3.connect(DB)
- try:origine.backup(cible)
- finally:cible.close();origine.close()
- init()  # Reapply additive migrations when restoring a pre-V2.2 database.
- audit(c,p,'database_restored',{'file':nom,'sauvegarde_prealable':securite.name,'fichiers_restaures':fichiers})
- return {'ok':True,'sauvegarde_prealable':securite.name,'fichiers_restaures':fichiers,
-         'avertissement':None if archive.is_file() else 'Sauvegarde ancienne sans archive de fichiers importés'}
-
+ return mc_backups.restaurer(c,p,d,racine=ROOT,base=DB,audit=audit,init=init)
 def demander_arret():
  threading.Thread(target=lambda: SERVEUR[0] and SERVEUR[0].shutdown(),daemon=True).start()
  return {'ok':True,'arret':'imminent'}
 
 def rotation_sauvegardes(limite=10):
- base=ROOT/'backups'
- candidats=list(base.glob('dioptre-auto-*.sqlite3'))+list(base.glob('bm318d-auto-*.sqlite3'))
- vieux=sorted(candidats,key=lambda x:x.stat().st_mtime,reverse=True)[limite:]
- for fichier in vieux:
-  fichier.unlink(missing_ok=True)
-  fichier.with_suffix('.imports.zip').unlink(missing_ok=True)
- return len(vieux)
-
+ return mc_backups.rotation(ROOT,limite)
 def boucle_sauvegardes(minutes):
- while True:
-  time.sleep(max(60,int(minutes)*60))
-  try:
-   base=ROOT/'backups'
-   sauvegarder(base/('dioptre-auto-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'.sqlite3'))
-   rotation_sauvegardes(10)
-  except Exception:
-   pass
-
+ return mc_backups.boucle(ROOT,DB,minutes)
 def _dispatch(c,path,d):
  mc_security.authorize_route(c,path,d)
  p=int(d.get('project',0))
