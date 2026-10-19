@@ -16,6 +16,13 @@ connector code, security/sandbox modules, installer scripts, and automated tests
 - **AI support:** local Ollama and compatible provider integrations, per-agent assignments, quotas/fallback behavior, and connector management.
 - **Security work:** route authorization, isolated workspaces, sandbox backends, permission checks, and tests.
 
+## Audit status
+
+Audited externally on 19/10/2026 (static review + dynamic tests on an isolated
+server). Report closed with **0 open findings**: two weak points fixed in 2.5.4
+(Ollama model names now escaped, ZIP manifest size bounded), one withdrawn by
+the auditor. Details: `AUDIT/04-RESULTAT-AUDIT-2.5.4.md`.
+
 ## Audit pack
 
 `AUDIT/00-LIRE-EN-PREMIER.md` describes what to audit, by priority, and lists the
