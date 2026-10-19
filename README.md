@@ -4,7 +4,7 @@
 Ce depot contient la source complete de l'application Windows : service Python
 local, interface Mission Control, connecteurs IA, bac a sable, tests.
 
-BM318D is a local-first Windows control center for organizing projects, AI agents,
+Dioptre is a local-first Windows control center for organizing projects, AI agents,
 missions, assignments, and their evidence. The repository contains the Python
 desktop/server application, the Mission Control web interface, AI-provider and MCP
 connector code, security/sandbox modules, installer scripts, and automated tests.
