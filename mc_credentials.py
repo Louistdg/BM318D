@@ -64,10 +64,13 @@ def put(connector_id, secret):
 
 
 def _lire(cible):
+    """Rend la valeur, None si la cible n'existe pas, leve si le coffre echoue."""
     dll = api()
     pointer = ctypes.POINTER(Credential)()
     if not dll.CredReadW(cible, 1, 0, ctypes.byref(pointer)):
-        return None
+        if ctypes.get_last_error() == 1168:   # ERROR_NOT_FOUND
+            return None
+        raise ValueError('Coffre Windows indisponible')
     try:
         return ctypes.string_at(pointer.contents.CredentialBlob, pointer.contents.CredentialBlobSize).decode('utf-16-le')
     finally:
