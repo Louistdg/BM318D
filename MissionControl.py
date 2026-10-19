@@ -1285,6 +1285,7 @@ class Handler(legacy.Handler):
    self.reply({'ok':True,**result},201)
   except PermissionError as e:self.reply({'error':str(e)},403)
   except mc_documents.RevisionConflict as e:self.reply({'error':str(e)},409)
+  except FileExistsError as e:self.reply({'error':str(e)},409)
   except (ValueError,KeyError,TypeError,sqlite3.Error) as e:self.reply({'error':str(e)},400)
 if __name__=='__main__':
  import sys
