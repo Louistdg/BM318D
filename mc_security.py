@@ -110,6 +110,7 @@ ROUTES={
  'plan':'manage','plan/apply':'manage','orchestrator/run':'manage','charge':'manage',
  'security/token':'admin','security/revoke':'admin',
  'documents/save':'manage','documents/delete':'manage','documents/import':'manage',
+ 'corbeille/purge':'admin',
 }
 
 def authorize_route(c,path,d):
