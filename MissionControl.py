@@ -264,7 +264,7 @@ def journal(c,i,ligne):
 # --- P6 : roles personnalises, recrutement, equipes --------------------------
 # --- P7 : application, reglages, recherche, sauvegardes ----------------------
 SERVEUR=[None]
-VERSION='2.8.3'
+VERSION='2.8.4'
 MAX_TEXTE=200000
 MAX_PREUVE=8000
 ADMIN_TOKEN=os.environ.get('MC_ADMIN_TOKEN') or secrets.token_urlsafe(24)

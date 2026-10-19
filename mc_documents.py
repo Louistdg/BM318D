@@ -385,3 +385,24 @@ def delete(c, project, data, workspace_root=None):
     except OSError:
         rangee = None
     return {'deleted': item['id'], 'corbeille': str(rangee) if rangee else None}
+
+def reconcilier_racines(c, racine):
+    """Suit un changement de workspace : reprend les fiches dont le fichier a suivi.
+
+    On ne deplace rien et on ne devine rien : une fiche n'est mise a jour que si
+    le fichier existe sous la nouvelle racine et plus sous l'ancienne. Rend le
+    nombre de fiches rattachees.
+    """
+    racine = Path(racine)
+    fiches = c.execute("SELECT id,storage_root,storage_path FROM mc_documents "
+                       "WHERE storage_path IS NOT NULL AND deleted_at IS NULL "
+                       "AND storage_root<>?", (str(racine),)).fetchall()
+    rattachees = 0
+    for fiche in fiches:
+        relatif = fiche['storage_path']
+        nouveau = racine / relatif
+        ancien = Path(fiche['storage_root'] or '') / relatif
+        if nouveau.is_file() and not ancien.is_file():
+            c.execute('UPDATE mc_documents SET storage_root=? WHERE id=?', (str(racine), fiche['id']))
+            rattachees += 1
+    return rattachees

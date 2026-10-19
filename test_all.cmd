@@ -36,6 +36,8 @@ python -m unittest -q test_demo
 if errorlevel 1 goto :echec
 python -m unittest -q test_corbeille
 if errorlevel 1 goto :echec
+python -m unittest -q test_sandbox_wsl_reel
+if errorlevel 1 goto :echec
 
 set "ETAPE=04/12 - Application"
 echo.
