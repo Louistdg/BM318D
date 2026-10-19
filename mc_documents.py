@@ -2,7 +2,9 @@
 import math
 import base64
 import binascii
+import datetime
 import re
+import shutil
 import sqlite3
 import unicodedata
 from pathlib import Path
@@ -259,6 +261,29 @@ def _id(value):
     return value
 
 
+def _revision(value, action):
+    if type(value) is not int or value <= 0:
+        raise ValueError('Revision requise pour ' + action + ' : recharge la fiche avant de reessayer')
+    return value
+
+
+def _vers_corbeille(item, projet, workspace_root):
+    """Deplace le fichier importe d'une fiche supprimee dans corbeille/ (recuperable)."""
+    relatif = item.get('storage_path')
+    if not relatif:
+        return None
+    racine = Path(item.get('storage_root') or workspace_root).resolve()
+    source = racine / relatif
+    if not source.is_file():
+        return None
+    dossier = racine / 'corbeille'
+    dossier.mkdir(parents=True, exist_ok=True)
+    nom = '%s-p%d-%d-%s' % (datetime.datetime.now().strftime('%Y%m%d-%H%M%S'), projet, item['id'], source.name)
+    cible = dossier / nom
+    shutil.move(str(source), str(cible))
+    return cible
+
+
 def _text(value, max_length, required=False):
     if not isinstance(value, str) or len(value) > max_length or (required and not value.strip()):
         raise ValueError('Texte invalide')
@@ -307,7 +332,7 @@ def save(c, project, data):
     existing = None
     if 'id' in data:
         existing = _item(c, project, data['id'])
-        revision = _id(data.get('revision'))
+        revision = _revision(data.get('revision'), 'modifier la fiche')
         if revision != existing['revision']:
             raise RevisionConflict('Fiche modifiée ailleurs : recharge avant de réessayer')
     kind = data.get('kind', existing['kind'] if existing else 'file')
@@ -342,12 +367,16 @@ def save(c, project, data):
     return {'item': _item(c, project, ident)}
 
 
-def delete(c, project, data):
+def delete(c, project, data, workspace_root=None):
     item = _item(c, project, data.get('id'))
-    if _id(data.get('revision')) != item['revision']:
+    if _revision(data.get('revision'), 'supprimer la fiche') != item['revision']:
         raise RevisionConflict('Fiche modifiée ailleurs : suppression refusée')
     if c.execute('SELECT 1 FROM mc_documents WHERE parent_id=? AND deleted_at IS NULL', (item['id'],)).fetchone():
         raise ValueError('Dossier non vide : déplace les éléments avant suppression')
     c.execute("UPDATE mc_documents SET deleted_at=CURRENT_TIMESTAMP,revision=revision+1 WHERE id=? AND project_id=? AND revision=?",
               (item['id'],project,item['revision']))
-    return {'deleted': item['id']}
+    try:
+        rangee = _vers_corbeille(item, project, workspace_root)
+    except OSError:
+        rangee = None
+    return {'deleted': item['id'], 'corbeille': str(rangee) if rangee else None}

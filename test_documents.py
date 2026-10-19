@@ -242,7 +242,7 @@ class Documents(unittest.TestCase):
         previous_root = mc.ROOT
         mc.ROOT = Path(_temp.name)
         try:
-            backup = mc.sauvegarder()
+            backup = mc.sauvegarder(Path(_temp.name) / 'backups' / 'conflit-http.sqlite3')
             target = root / item['storage_path']
 
             def restaurer():
@@ -268,6 +268,30 @@ class Documents(unittest.TestCase):
             self.assertEqual(target.read_bytes(), b'modifie localement')
         finally:
             mc.ROOT = previous_root
+
+    def test_delete_requires_revision_with_clear_message(self):
+        item = self.create(kind='file', title='A supprimer')
+        with self.assertRaises(ValueError) as contexte:
+            with mc.connect() as c:
+                mc_documents.delete(c, 1, {'id': item['id']})
+        self.assertIn('Revision requise', str(contexte.exception))
+
+    def test_delete_moves_imported_file_to_corbeille(self):
+        root = Path(_temp.name) / 'corbeille-projet'
+        with mc.connect() as c:
+            item = mc_documents.import_file(c, 1, {'name': 'a-supprimer.txt',
+                'data': base64.b64encode(b'contenu a archiver').decode()}, root)['item']
+            resultat = mc_documents.delete(c, 1, {'id': item['id'], 'revision': item['revision']}, root)
+        source = root / item['storage_path']
+        self.assertFalse(source.exists(), 'le fichier doit quitter fichiers-importes')
+        self.assertTrue(resultat.get('corbeille'))
+        rangee = Path(resultat['corbeille'])
+        self.assertTrue(rangee.is_file())
+        self.assertEqual(rangee.read_bytes(), b'contenu a archiver')
+        self.assertEqual(rangee.parent.name, 'corbeille')
+        with mc.connect() as c:
+            ligne = c.execute('SELECT deleted_at FROM mc_documents WHERE id=?', (item['id'],)).fetchone()
+        self.assertTrue(ligne and ligne[0])
 
 
 if __name__ == '__main__':

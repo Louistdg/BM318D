@@ -180,7 +180,7 @@ def init():
 def sauvegarder(destination=None, *, inclure_imports=True):
  # Copie en ligne (API backup de SQLite) : coherente meme si le serveur ecrit.
  if not DB.is_file():return None
- destination=Path(destination) if destination else ROOT/'backups'/('bm318d-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'.sqlite3')
+ destination=Path(destination) if destination else ROOT/'backups'/('bm318d-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.sqlite3')
  destination.parent.mkdir(parents=True,exist_ok=True)
  source=sqlite3.connect(DB,timeout=20)
  try:
@@ -748,7 +748,7 @@ def charge_agents(c,p):
 
 # --- P7 : application, reglages, recherche, sauvegardes ----------------------
 SERVEUR=[None]
-VERSION='2.5.2'
+VERSION='2.5.3'
 MAX_TEXTE=200000
 MAX_PREUVE=8000
 ADMIN_TOKEN=os.environ.get('MC_ADMIN_TOKEN') or secrets.token_urlsafe(24)
