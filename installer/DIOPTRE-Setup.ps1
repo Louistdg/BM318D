@@ -12,7 +12,7 @@ New-Item -ItemType Directory -Force -Path $TargetDir | Out-Null
 $fichiers = @('MissionControl.py','mc_agent.py','mc_plan.py','mc_sandbox.py','mc_sandbox_wsl.py','mc_sandbox_linux.py','mc_security.py','mc_connectors.py','mc_credentials.py','mc_documents.py','DIOPTRE-WebServer.py',
               'DIOPTRE.html','mission.js','mission.css','connectors.js','security-ui.js','workspace.js','workspace.css','installer\version.json',
               'DIOPTRE-Controleur.pyw','DIOPTRE-Stop.py','LANCER-DIOPTRE-RAILWAY.cmd','requirements-v22.txt',
-              'README.md','MISSION-CONTROL-LISEZMOI.txt','docs\DELIVERY-V25-HOTFIX.md','docs\SECURITY-STATUS.md')
+              'README.md','DIOPTRE-LISEZMOI.txt','docs\DELIVERY-V25-HOTFIX.md','docs\SECURITY-STATUS.md','mc_demo.py')
 $copies = 0
 foreach ($nom in $fichiers) {
   $chemin = Join-Path $source $nom
@@ -39,6 +39,17 @@ $lanceur = @"
 cd /d "%~dp0"
 start "" pythonw "%~dp0DIOPTRE-Controleur.pyw"
 "@
+
+$demo = @"
+@echo off
+cd /d "%~dp0"
+echo Creation d'une demonstration complete (projet, agents, mission, job approuve, revue, note)...
+python "%~dp0mc_demo.py"
+echo.
+pause
+"@
+Set-Content -Path (Join-Path $TargetDir 'LANCER-DIOPTRE-DEMO.cmd') -Value $demo -Encoding ASCII
+
 Set-Content -Path (Join-Path $TargetDir 'LANCER-DIOPTRE.cmd') -Value $lanceur -Encoding ASCII
 
 $arret = @"
