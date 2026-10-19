@@ -748,7 +748,7 @@ def charge_agents(c,p):
 
 # --- P7 : application, reglages, recherche, sauvegardes ----------------------
 SERVEUR=[None]
-VERSION='2.5.1'
+VERSION='2.5.2'
 MAX_TEXTE=200000
 MAX_PREUVE=8000
 ADMIN_TOKEN=os.environ.get('MC_ADMIN_TOKEN') or secrets.token_urlsafe(24)
