@@ -293,6 +293,24 @@ class Documents(unittest.TestCase):
             ligne = c.execute('SELECT deleted_at FROM mc_documents WHERE id=?', (item['id'],)).fetchone()
         self.assertTrue(ligne and ligne[0])
 
+    def test_huge_manifest_is_refused_before_reading(self):
+        """Audit 2.5.3, constat faible 2 : un manifeste enorme est refuse sans etre decompresse."""
+        import zipfile
+        bombe = Path(_temp.name) / 'bombe.imports.zip'
+        with zipfile.ZipFile(bombe, 'w', zipfile.ZIP_DEFLATED) as z:
+            z.writestr('manifest.json', b'0' * (9 * 1024 * 1024))
+        instantane = Path(_temp.name) / 'snap-bombe.sqlite3'
+        mc.sauvegarder(instantane, inclure_imports=False)
+        with self.assertRaises(ValueError) as contexte:
+            mc_documents.restore_imports(instantane, bombe)
+        self.assertIn('trop volumineux', str(contexte.exception))
+
+    def test_model_names_are_escaped_in_the_page(self):
+        """Audit 2.5.3, constat faible 1 : les noms de modeles passent par escapeHtml."""
+        page = (Path(__file__).parent / 'BM318d-Railway.html').read_text(encoding='utf-8')
+        self.assertIn('escapeHtml(m)', page)
+        self.assertNotIn("'<option value=\"'+m+'\">'+m+'</option>'", page)
+
 
 if __name__ == '__main__':
     unittest.main()

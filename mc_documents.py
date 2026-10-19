@@ -133,7 +133,12 @@ def restore_imports(snapshot, archive):
             raise FileNotFoundError('Archive des fichiers importés absente : restauration refusée')
         return 0
     with zipfile.ZipFile(archive) as z:
-        data=z.read('manifest.json')
+        # Taille declaree verifiee avant toute decompression, puis lecture bornee.
+        entree=z.getinfo('manifest.json')
+        if entree.file_size>8*1024*1024:
+            raise ValueError('Manifeste de sauvegarde trop volumineux')
+        with z.open('manifest.json') as flux:
+            data=flux.read(8*1024*1024+1)
         if len(data)>8*1024*1024:
             raise ValueError('Manifeste de sauvegarde trop volumineux')
         doc=json.loads(data)

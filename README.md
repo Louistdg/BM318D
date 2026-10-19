@@ -48,11 +48,20 @@ AUDIT/                 brief d'audit, commandes de test, audit du site
 - session token in an HttpOnly cookie plus `X-MC-Token` header;
 - separate administrator token (`X-MC-Admin`) for sensitive routes;
 - host and origin checks, body size and rate limits;
-- Windows sandbox (restricted token, low integrity, job object) for job execution;
+- job execution goes through `mc_sandbox.py`, which refuses any unrestricted
+  fallback: under Windows it transports to **WSL**, where isolation is
+  **bubblewrap + seccomp + namespaces** (`mc_sandbox_linux.py`). The native
+  Windows backend is explicitly refused as unvalidated;
 - MCP discovery locked by default.
 
-Known limits: sandbox is Windows-only, file reads outside the workspace are not
-confined, the sandboxed child network is not filtered, SQLite is single-file.
+Known limits: isolation requires WSL on Windows, file reads outside the
+workspace are not confined, the sandboxed child network is not filtered by the
+application, SQLite is single-file.
+
+The stdlib-only claim covers the server, the interface, the database, documents
+and security. MCP discovery is the one exception: it imports `mcp`, and
+deliberately `httpx2` / `httpcore2`, which do not exist publicly. That is a lock,
+not a dependency: discovery fails closed instead of opening by accident.
 
 ## Quick start
 
