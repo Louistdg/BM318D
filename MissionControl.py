@@ -761,7 +761,7 @@ def charge_agents(c,p):
 
 # --- P7 : application, reglages, recherche, sauvegardes ----------------------
 SERVEUR=[None]
-VERSION='2.6.2'
+VERSION='2.7.0'
 MAX_TEXTE=200000
 MAX_PREUVE=8000
 ADMIN_TOKEN=os.environ.get('MC_ADMIN_TOKEN') or secrets.token_urlsafe(24)
@@ -1303,6 +1303,13 @@ class Handler(legacy.Handler):
   except (ValueError,KeyError,TypeError,sqlite3.Error) as e:self.reply({'error':str(e)},400)
 if __name__=='__main__':
  import sys
+ if '--demo' in sys.argv:
+  import mc_demo
+  init()
+  with connect() as c:
+   resultat=mc_demo.creer(c)
+  print('Demonstration creee : projet',resultat.get('project_id'),flush=True)
+  sys.exit(0)
  if '--sauvegarde' in sys.argv:
   chemin=sauvegarder()
   print('Sauvegarde écrite : '+str(chemin),flush=True);sys.exit(0)
