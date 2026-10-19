@@ -1,6 +1,6 @@
-# BM318D — Control Center
+# DIOPTRE
 
-**Version 2.5.3 — 19/10/2026.** Nom public du produit : **DIOPTRE**.
+**Version 2.5.4 — 19/10/2026.** Ancien nom de code : **BM318D**, encore présent dans certains noms de fichiers de l'application (par exemple `LANCER-BM318d.cmd`).
 Ce depot contient la source complete de l'application Windows : service Python
 local, interface Mission Control, connecteurs IA, bac a sable, tests.
 
