@@ -108,7 +108,7 @@ MC_RATE_LIMIT      requêtes par minute et par IP
 MC_MAX_JOBS        jobs simultanés
 MC_WORKSPACES      dossier des espaces de travail
 MC_OLLAMA_MODEL    modèle par défaut
-MC_SANDBOX         active ou désactive le bac à sable
+MC_SANDBOX         dossier de travail du bac à sable (pas un interrupteur)
 ```
 
 ## 8. Ce qui ne peut pas être testé ailleurs

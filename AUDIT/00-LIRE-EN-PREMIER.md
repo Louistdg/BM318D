@@ -79,8 +79,10 @@ Tkinter ne fonctionnent pas. C'est documenté comme limite, pas comme bug.
 ## 6. Limites connues, à ne pas présenter comme des découvertes
 
 - **Exécutable non signé** : Windows affiche un avertissement SmartScreen.
-- **Bac à sable Windows uniquement** : sous Linux, aucune isolation n'est
-  appliquée (le module le dit et refuse).
+- **Bac à sable : WSL + bubblewrap + seccomp.** Sous Windows, l'exécution est
+  transportée vers WSL et isolée par bwrap ; le backend Windows natif est
+  explicitement refusé (non validé). Sous Linux, `mc_sandbox_linux.py` applique
+  bwrap + seccomp + namespaces.
 - **Lecture hors workspace non confinée** : le bac à sable restreint les
   privilèges, pas la lecture de fichiers.
 - **Réseau de l'enfant non filtré** : un job sandboxé peut ouvrir une connexion.
