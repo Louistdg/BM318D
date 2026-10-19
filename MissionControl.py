@@ -9,6 +9,8 @@ import mc_documents
 import mc_legacy
 import mc_backups
 import mc_missions
+import mc_routes
+import sys
 import contextvars,functools,inspect
 ROOT=Path(__file__).resolve().parent
 # Base et port surchargeables : les tests d'integration tournent sur une copie
@@ -866,26 +868,7 @@ def rotation_sauvegardes(limite=10):
  return mc_backups.rotation(ROOT,limite)
 def boucle_sauvegardes(minutes):
  return mc_backups.boucle(ROOT,DB,minutes)
-def _dispatch(c,path,d):
- mc_security.authorize_route(c,path,d)
- p=int(d.get('project',0))
- if path not in ('/api/mc/shutdown','/api/mc/backups','/api/mc/security/revoke'):
-  project(c,p)
- if path=='/api/mc/security/token':
-  a=agent(c,p,int(d['agent_id']))
-  if a['status']=='archived':raise ValueError('Agent archivé')
-  return mc_security.issue(p,a['id'],d.get('actions'),int(d.get('ttl',900)))
- if path=='/api/mc/security/revoke':
-  mc_security.revoke(required_text(d,'grant_id',100));return {'revoked':True}
- if path.startswith('/api/mc/connectors/'):
-  return mc_connectors.dispatch(c,p,path.rsplit('/',1)[-1],d)
- if path=='/api/mc/documents/save':return mc_documents.save(c,p,d)
- if path=='/api/mc/documents/delete':return mc_documents.delete(c,p,d)
- if path=='/api/mc/documents/import':
-  result=mc_documents.import_file(c,p,d,reglages(c,p).get('workspace_dir'))
-  audit(c,p,'document_imported',{'id':result['item']['id'],'filename':result['item']['title'],'bytes':result['bytes']})
-  return result
- if path=='/api/mc/agent':
+def agent_creer(c,p,d):
   name=required_text(d,'name',100);role=required_text(d,'role',40)
   if not role_valide(c,p,role):raise ValueError('Rôle inconnu')
   team=str(d.get('team','Général')).strip()[:80] or 'Général'
@@ -894,7 +877,8 @@ def _dispatch(c,path,d):
   cur=c.execute('INSERT INTO mc_agents(project_id,name,role,team,manager_id,x,y,instructions,skills) VALUES(?,?,?,?,?,?,?,?,?)',(p,name,role,team,manager,int(d.get('x',120)),int(d.get('y',120)),str(d.get('instructions',''))[:2000],str(d.get('skills',''))[:300]))
   c.execute('INSERT OR IGNORE INTO mc_team_permissions(project_id,team) VALUES(?,?)',(p,team))
   audit(c,p,'agent_created',{'id':cur.lastrowid,'name':name});return {'id':cur.lastrowid}
- if path=='/api/mc/agent/update':
+
+def agent_modifier(c,p,d):
   i=int(d['id']);a=agent(c,p,i)
   updates={}
   for k in ('name','team','instructions','model','skills'):
@@ -923,43 +907,22 @@ def _dispatch(c,path,d):
   if not updates:raise ValueError('Aucun changement')
   c.execute('UPDATE mc_agents SET '+','.join(k+'=?' for k in updates)+' WHERE id=?',(*updates.values(),i))
   audit(c,p,'agent_updated',{'id':i,'changes':updates});return {'id':i}
- if path=='/api/mc/link':return mc_missions.lien_creer(c,p,d)
- if path=='/api/mc/mission':return mc_missions.mission_creer(c,p,d)
- if path=='/api/mc/assignment':return mc_missions.affectation_creer(c,p,d)
- if path=='/api/mc/assignment/update':return mc_missions.affectation_modifier(c,p,d)
- if path=='/api/mc/note':return mc_missions.note_creer(c,p,d)
- if path=='/api/mc/decision':return mc_missions.decision_creer(c,p,d)
- if path=='/api/mc/message':return mc_missions.message_envoyer(c,p,d)
- if path=='/api/mc/message/read':return mc_missions.message_lire(c,p,d)
- if path=='/api/mc/handoff/ack':return mc_missions.handoff_ack(c,p,d)
- if path=='/api/mc/job':return job_creer(c,p,d)
- if path=='/api/mc/job/run':return job_lancer(c,p,int(d['id']))
- if path=='/api/mc/job/pause':return job_pause(c,p,int(d['id']))
- if path=='/api/mc/job/resume':return job_reprendre(c,p,int(d['id']))
- if path=='/api/mc/job/approve':return job_approuver(c,p,int(d['id']),d)
- if path=='/api/mc/job/reject':return job_refuser(c,p,int(d['id']),d)
- if path=='/api/mc/job/cancel':return job_annuler(c,p,int(d['id']))
- if path=='/api/mc/job/test':return job_tester(c,p,int(d['id']),d)
- if path=='/api/mc/review':return review_creer(c,p,d)
- if path=='/api/mc/role':return role_creer(c,p,d)
- if path=='/api/mc/branch':return branche_creer(c,p,d)
- if path=='/api/mc/branch/update':return branche_modifier(c,p,d)
- if path=='/api/mc/agent/clone':return agent_clone(c,p,d)
- if path=='/api/mc/agent/archive':return agent_archiver(c,p,d)
- if path=='/api/mc/recruit':return recrue_creer(c,p,d)
- if path=='/api/mc/recruit/decide':return recrue_decider(c,p,d)
- if path=='/api/mc/permissions':return permissions_definir(c,p,d)
- if path=='/api/mc/settings':return reglage_definir(c,p,d)
- if path=='/api/mc/backup':return {'file':sauvegarder().name}
- if path=='/api/mc/restore':return restaurer_sauvegarde(c,p,d)
- if path=='/api/mc/shutdown':return demander_arret()
- if path=='/api/mc/job/validate':return job_valider(c,p,d)
- if path=='/api/mc/job/commit':return job_commit(c,p,d)
- if path=='/api/mc/plan':return plan_proposer(c,p,d)
- if path=='/api/mc/plan/apply':return plan_appliquer(c,p,d)
- if path=='/api/mc/orchestrator/run':return orchestrateur_lancer(c,p,d)
- if path=='/api/mc/charge':return charge_agents(c,p)
- raise ValueError('Action inconnue')
+
+ROUTES=mc_routes.construire(sys.modules[__name__])
+
+
+def _dispatch(c,path,d):
+ mc_security.authorize_route(c,path,d)
+ p=int(d.get('project',0))
+ if path not in mc_routes.SANS_PROJET:
+  project(c,p)
+ if path.startswith('/api/mc/connectors/'):
+  return mc_connectors.dispatch(c,p,path.rsplit('/',1)[-1],d)
+ fonction=ROUTES.get(path)
+ if fonction is None:raise ValueError('Action inconnue')
+ return fonction(c,p,d)
+
+
 def dispatch(c,path,d,principal=None):
  identity=principal if principal is not None else mc_security.current()
  with mc_security.use(identity):
