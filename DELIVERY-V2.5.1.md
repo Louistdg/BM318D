@@ -1,10 +1,10 @@
-# BM318D — Livraison V2.5.1 : consolidation A1–A4 et vérification B1
+﻿# BM318D — Livraison V2.5.1 : consolidation A1–A4 et vérification B1
 
 **Date du rapport :** 18 octobre 2026
 
-**Dépôt :** [Louistdg/BM318D](https://github.com/Louistdg/BM318D)
+**Dépôt :** [Louistdg/DIOPTRE](https://github.com/Louistdg/DIOPTRE)
 
-**Branche de livraison :** [`codex/v25-import-fichiers`](https://github.com/Louistdg/BM318D/tree/codex/v25-import-fichiers)
+**Branche de livraison :** [`codex/v25-import-fichiers`](https://github.com/Louistdg/DIOPTRE/tree/codex/v25-import-fichiers)
 
 **Base de travail :** `codex/v25-railway-workspace` (V2.5.1, `c7f6bec`)
 
