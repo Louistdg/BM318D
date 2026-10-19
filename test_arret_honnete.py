@@ -40,7 +40,7 @@ def attendre(url):
 
 
 def demarrer():
-    dossier = Path(tempfile.mkdtemp(prefix='bm318d-arret-'))
+    dossier = Path(tempfile.mkdtemp(prefix='dioptre-arret-'))
     with socket.socket() as s:
         s.bind(('127.0.0.1', 0))
         port = s.getsockname()[1]
@@ -68,7 +68,7 @@ def demarrer():
 
 def charger_fenetre():
     nom = 'fenetre_arret_%d' % time.time_ns()
-    loader = importlib.machinery.SourceFileLoader(nom, str(RACINE / 'BM318d-Fenetre.pyw'))
+    loader = importlib.machinery.SourceFileLoader(nom, str(RACINE / 'DIOPTRE-Fenetre.pyw'))
     spec = importlib.util.spec_from_loader(nom, loader)
     mod = importlib.util.module_from_spec(spec)
     loader.exec_module(mod)
@@ -114,13 +114,13 @@ def main():
         ok('le message de sauvegarde refusée ne contient pas le jeton', isinstance(sauve, tuple) and secret_absent(sauve[1], jeton_admin))
 
         admin_path.write_text(jeton_admin, encoding='utf-8')
-        avant = set(p.name for p in (RACINE / 'backups').glob('bm318d-*.sqlite3')) if (RACINE / 'backups').exists() else set()
+        avant = set(p.name for p in (RACINE / 'backups').glob('dioptre-*.sqlite3')) if (RACINE / 'backups').exists() else set()
         sauve_ok = fenetre.tenter_sauvegarde()
         ok('la sauvegarde réussit seulement avec une confirmation', isinstance(sauve_ok, tuple) and sauve_ok[0] is True)
         ok('le message de sauvegarde ne contient pas le jeton', isinstance(sauve_ok, tuple) and secret_absent(sauve_ok[1], jeton_admin))
         nouveaux = []
         if (RACINE / 'backups').exists():
-            nouveaux = [p for p in (RACINE / 'backups').glob('bm318d-*.sqlite3') if p.name not in avant]
+            nouveaux = [p for p in (RACINE / 'backups').glob('dioptre-*.sqlite3') if p.name not in avant]
         ok('le fichier annoncé existe', bool(nouveaux) and all(p.is_file() for p in nouveaux))
         for p in nouveaux:
             p.unlink()
@@ -149,7 +149,7 @@ def main():
         env['MC_PORT'] = str(port2)
         if jeton_clone.exists():
             jeton_clone.unlink()
-        refuse = subprocess.run([sys.executable, str(RACINE / 'BM318d-Stop.py')], cwd=str(RACINE), env=env,
+        refuse = subprocess.run([sys.executable, str(RACINE / 'DIOPTRE-Stop.py')], cwd=str(RACINE), env=env,
                                 capture_output=True, text=True, timeout=20)
         ok('Stop.py sans jeton administrateur échoue', refuse.returncode == 1)
         ok('Stop.py ne confirme pas l\'arrêt', 'confirm' not in (refuse.stdout or '').lower() or 'non confirm' in (refuse.stdout or '').lower())
@@ -157,7 +157,7 @@ def main():
         ok('le service tourne encore après le refus', serveur_repond(url2) and proc2.poll() is None)
         jeton_clone.parent.mkdir(exist_ok=True)
         jeton_clone.write_text(jeton2, encoding='utf-8')
-        accepte = subprocess.run([sys.executable, str(RACINE / 'BM318d-Stop.py')], cwd=str(RACINE), env=env,
+        accepte = subprocess.run([sys.executable, str(RACINE / 'DIOPTRE-Stop.py')], cwd=str(RACINE), env=env,
                                  capture_output=True, text=True, timeout=20)
         ok('Stop.py confirme l\'arrêt quand le fichier local est là', accepte.returncode == 0)
         ok('la sortie de succès ne contient pas le jeton', secret_absent(accepte.stdout + accepte.stderr, jeton2))

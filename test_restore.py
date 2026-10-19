@@ -27,7 +27,7 @@ def ok(nom, condition, detail=''):
         print('  ECHEC ' + nom + (('  -> ' + str(detail)[:300]) if detail != '' else ''))
 
 
-dossier = Path(tempfile.mkdtemp(prefix='bm318d-restauration-'))
+dossier = Path(tempfile.mkdtemp(prefix='dioptre-restauration-'))
 mc.DB = dossier / 'travail.sqlite3'
 vraie = mc.DB
 

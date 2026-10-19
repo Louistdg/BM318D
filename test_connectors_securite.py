@@ -1,4 +1,4 @@
-"""BM318d V2.3 — tests négatifs des connecteurs (SSRF, erreurs, quotas, coffre, MCP).
+"""DIOPTRE V2.3 — tests négatifs des connecteurs (SSRF, erreurs, quotas, coffre, MCP).
 
 Même harnais que test_connectors.py : base temporaire, serveur HTTP local simulé.
 Aucune vraie clé, aucun appel à un fournisseur réel.
@@ -18,7 +18,7 @@ from pathlib import Path
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parent
-TEMP = tempfile.TemporaryDirectory(prefix='bm318d-v23-')
+TEMP = tempfile.TemporaryDirectory(prefix='dioptre-v23-')
 os.environ['MC_DB'] = str(Path(TEMP.name) / 'test.sqlite3')
 import mc_connectors as cx
 import mc_credentials as vault

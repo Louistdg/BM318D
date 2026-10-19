@@ -111,7 +111,7 @@ def executer(argv,cwd,delai=30,memoire_mo=1024,max_processus=8,cancel_event=None
             except ValueError:pass
         args.append(a)
     start=time.monotonic()
-    with tempfile.TemporaryDirectory(prefix='bm318d-v23-') as directory:
+    with tempfile.TemporaryDirectory(prefix='dioptre-v23-') as directory:
         directory=Path(directory);copy=directory/'workspace'
         if not _git:
             copie_sure(source,copy)
@@ -123,7 +123,7 @@ def executer(argv,cwd,delai=30,memoire_mo=1024,max_processus=8,cancel_event=None
         with seccomp.open('rb') as filter_file, (directory/'stdout').open('w+b') as out, (directory/'stderr').open('w+b') as err:
             cmd=[BWRAP,'--unshare-all','--die-with-parent','--new-session','--cap-drop','ALL','--clearenv',
                  '--ro-bind','/usr','/usr','--symlink','usr/lib','/lib','--symlink','usr/lib64','/lib64',
-                 '--symlink','usr/bin','/bin','--proc','/proc','--dev','/dev','--bind',str(memory_tmp),'/tmp','--hostname','bm318d-sandbox',
+                 '--symlink','usr/bin','/bin','--proc','/proc','--dev','/dev','--bind',str(memory_tmp),'/tmp','--hostname','dioptre-sandbox',
                  '--bind',str(memory_workspace),'/workspace','--chdir','/workspace','--seccomp',str(filter_file.fileno())]
             env={'HOME':'/workspace','USERPROFILE':'/workspace','TEMP':'/workspace','TMP':'/workspace',
                  'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONIOENCODING':'utf-8','PYTHONDONTWRITEBYTECODE':'1'}
@@ -171,7 +171,7 @@ def commit_git(cwd,message,cancel_event=None):
     if (directory/'.git').exists() and not (directory/'.git').is_dir():raise Refus('Git externe/worktree lié refusé')
     flags=['-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false','-c','commit.gpgsign=false',
            '-c','gc.auto=0','-c','maintenance.auto=false','-c','init.templateDir=',
-           '-c','user.email=bm318d@local','-c','user.name=BM318d',
+           '-c','user.email=dioptre@local','-c','user.name=DIOPTRE',
            '--git-dir=/workspace/.git','--work-tree=/workspace']
     def run(*arguments):
         result=executer(['git',*flags,*arguments],str(directory),cancel_event=cancel_event,_git=True)

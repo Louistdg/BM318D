@@ -1,5 +1,5 @@
 from pathlib import Path
-p=Path('BM318d-Railway.html')
+p=Path('DIOPTRE.html')
 s=p.read_text(encoding='utf-8')
 # Improve empty state and interaction hints
 s=s.replace('Glisser pour déplacer · Molette pour zoomer · Cliquer pour les détails','Glisser une carte · Déplacer le fond · Molette : zoom · Cliquer : détails')

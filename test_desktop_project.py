@@ -43,13 +43,13 @@ def fixture(state):
         folder = Path(folder)
         (folder / 'logs').mkdir()
         (folder / 'logs/admin-token.txt').write_text('synthetic-admin', encoding='utf-8')
-        loader = importlib.machinery.SourceFileLoader('desktop_project_fixture', str(ROOT / 'BM318d-Fenetre.pyw'))
+        loader = importlib.machinery.SourceFileLoader('desktop_project_fixture', str(ROOT / 'DIOPTRE-Fenetre.pyw'))
         spec = importlib.util.spec_from_loader(loader.name, loader)
         window = importlib.util.module_from_spec(spec)
         loader.exec_module(window)
         window.URL = 'http://127.0.0.1:%d/' % server.server_port
         window.LOGS = folder / 'logs'
-        shutil.copy2(ROOT / 'BM318d-Stop.py', folder / 'BM318d-Stop.py')
+        shutil.copy2(ROOT / 'DIOPTRE-Stop.py', folder / 'DIOPTRE-Stop.py')
         try:
             yield window, folder, posts, server.server_port
         finally:
@@ -70,7 +70,7 @@ class DesktopProject(unittest.TestCase):
         import os
         for state in ('error', {'projects': []}, {'projects': [[0, 'invalid']]}):
             with self.subTest(state=state), fixture(state) as (window, folder, posts, port):
-                result = subprocess.run([sys.executable, str(folder / 'BM318d-Stop.py')],
+                result = subprocess.run([sys.executable, str(folder / 'DIOPTRE-Stop.py')],
                     env={**os.environ, 'MC_PORT': str(port)}, capture_output=True, text=True, timeout=10)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertEqual(posts, [])
@@ -86,7 +86,7 @@ class DesktopProject(unittest.TestCase):
     def test_stop_uses_actual_project(self):
         import os
         with fixture({'projects': [[7, 'real']]}) as (window, folder, posts, port):
-            result = subprocess.run([sys.executable, str(folder / 'BM318d-Stop.py')],
+            result = subprocess.run([sys.executable, str(folder / 'DIOPTRE-Stop.py')],
                 env={**os.environ, 'MC_PORT': str(port)}, capture_output=True, text=True, timeout=10)
             self.assertEqual(result.returncode, 0, result.stdout)
             self.assertEqual([body['project'] for _, body in posts], [7])

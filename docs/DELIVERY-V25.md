@@ -1,6 +1,6 @@
-# BM318d V2.5 — refonte de l’espace projet (branche isolée)
+# DIOPTRE V2.5 — refonte de l’espace projet (branche isolée)
 
-Date : 18 octobre 2026. **Non déployé.** Travail réalisé dans `D:\BM318d-worktrees\codex-v24-delivery`, branche `codex/v25-railway-workspace`, base initiale `7f011073`.
+Date : 18 octobre 2026. **Non déployé.** Travail réalisé dans `D:\DIOPTRE-worktrees\codex-v24-delivery`, branche `codex/v25-railway-workspace`, base initiale `7f011073`.
 
 ## Fait vérifié
 
@@ -38,7 +38,7 @@ OK
 
 Les huit tests de documents échouaient **avant** les changements sur `sqlite3.OperationalError: no such table: mc_documents`. Après ajout de la table et du contrôleur, ils passent.
 
-Contrôle de migration réel sur une copie isolée issue de `D:\BM318d-Control-Center\bm318d.sqlite3` :
+Contrôle de migration réel sur une copie isolée issue de `D:\DIOPTRE-Control-Center\dioptre.sqlite3` :
 ```text
 ORIGINAL_TABLES=26
 CHANGED_EXISTING_TABLES={}
@@ -67,4 +67,4 @@ Observation directe dans un navigateur isolé : accueil canevas avec la tâche p
 
 ## À ne pas faire
 
-Ne pas remplacer la base `D:\BM318d-Control-Center\bm318d.sqlite3` par une base de test, ne pas redéployer directement depuis l'ancienne release et ne pas activer MCP. Ne passer en production qu'après revue du diff, sauvegarde et contrôle des données dans la version candidate.
+Ne pas remplacer la base `D:\DIOPTRE-Control-Center\dioptre.sqlite3` par une base de test, ne pas redéployer directement depuis l'ancienne release et ne pas activer MCP. Ne passer en production qu'après revue du diff, sauvegarde et contrôle des données dans la version candidate.

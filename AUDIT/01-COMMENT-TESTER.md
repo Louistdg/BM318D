@@ -55,7 +55,7 @@ C:\Python314\python.exe MissionControl.py
 Attendu :
 
 ```
-BM318d Mission Control http://127.0.0.1:31880/ (jeton de session actif)
+DIOPTRE Mission Control http://127.0.0.1:31880/ (jeton de session actif)
 ```
 
 Puis, dans un autre terminal :
@@ -114,6 +114,6 @@ MC_SANDBOX         dossier de travail du bac à sable (pas un interrupteur)
 ## 8. Ce qui ne peut pas être testé ailleurs
 
 - le bac à sable Windows (jeton restreint, intégrité basse, objet job) ;
-- les applications Tkinter (`BM318d-Controleur.pyw`, `BM318d-Stop.py`) ;
+- les applications Tkinter (`DIOPTRE-Controleur.pyw`, `DIOPTRE-Stop.py`) ;
 - l'intégration Ollama sur GPU (la carte testée n'est pas compilée dans cette
   version, tout tourne en CPU).

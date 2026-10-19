@@ -41,7 +41,7 @@ Le serveur est un hébergement o2switch, dossier `public_html/dioptre`.
 ```powershell
 $env:O2_FTP_USER = "compte-ftp"
 $env:O2_FTP_PASS = "mot-de-passe"
-powershell -File D:\MIGRATION-2026\BM318D\upload-dioptre.ps1 -FichierAcces ...
+powershell -File D:\MIGRATION-2026\DIOPTRE\upload-dioptre.ps1 -FichierAcces ...
 ```
 
 Le script envoie les fichiers, les relit et compare les empreintes SHA-256.
@@ -51,5 +51,5 @@ pas `ftp.socle-construction.be` — d'où l'hôte par défaut du script.
 ## Ce qui n'est pas ici
 
 - l'installateur (binaire, voir plus haut) ;
-- les captures d'écran de contrôle, conservées dans `D:\MIGRATION-2026\BM318D\captures\` ;
+- les captures d'écran de contrôle, conservées dans `D:\MIGRATION-2026\DIOPTRE\captures\` ;
 - les journaux de publication.

@@ -1,11 +1,11 @@
-/* BM318d V2.5 workspace: presentation and operator-only project documents. */
+/* DIOPTRE V2.5 workspace: presentation and operator-only project documents. */
 (() => {
  'use strict';
  const safe = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
  const rail = document.querySelector('.rail');
  const main = document.querySelector('.main');
  const token = (document.querySelector('meta[name="mc-token"]') || {}).content || '';
- const widthKey = 'bm318d.sidebar.width.v2', collapsedKey = 'bm318d.sidebar.collapsed.v2';
+ const widthKey = 'dioptre.sidebar.width.v2', collapsedKey = 'dioptre.sidebar.collapsed.v2';
  const mobile = () => matchMedia('(max-width:760px)').matches;
  const clamp = value => Math.max(175, Math.min(410, Math.round(Number(value) || 245)));
  let width = clamp(localStorage.getItem(widthKey) || 245);
@@ -206,7 +206,7 @@
      '<label>Titre</label><input id="docTitle" maxlength="160" required value="'+safe(item?.title||'')+'">'+
      '<label>Dossier parent</label><select id="docParent">'+folderChoices(item)+'</select>'+
      (folder?'':'<label>Type de contenu</label><select id="docContentType"><option value="note">Notes</option><option value="link">Liens</option><option value="info">Informations du projet</option></select><label>Contenu</label><textarea id="docContent" maxlength="8000" placeholder="Notes, liens ou informations…">'+safe(item?.content||'')+'</textarea>')+
-     (editing?'<p>'+(item?.storage_path?'<span class="subtle">Retirer la fiche de BM318d ne supprime pas le fichier sur ton disque.</span><br>':'')+'<button type="button" id="docDelete" class="doc-danger">Supprimer cette fiche</button></p>':''),
+     (editing?'<p>'+(item?.storage_path?'<span class="subtle">Retirer la fiche de DIOPTRE ne supprime pas le fichier sur ton disque.</span><br>':'')+'<button type="button" id="docDelete" class="doc-danger">Supprimer cette fiche</button></p>':''),
      async()=>{
        const payload={kind,title:docEl('docTitle').value,parent_id:docEl('docParent').value?Number(docEl('docParent').value):null};
        if(!folder){payload.content_type=docEl('docContentType').value;payload.content=docEl('docContent').value}

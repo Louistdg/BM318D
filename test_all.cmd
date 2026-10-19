@@ -11,7 +11,7 @@ if errorlevel 1 (
     exit /b 2
 )
 
-echo === BM318D - Verification complete V2.5.1 ===
+echo === DIOPTRE - Verification complete V2.5.1 ===
 
 set "ETAPE=01/12 - Compilation Python"
 echo.

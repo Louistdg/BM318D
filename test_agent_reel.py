@@ -64,7 +64,7 @@ if not modele:
     print('Aucun modele installe : test impossible')
     sys.exit(2)
 
-dossier = Path(tempfile.mkdtemp(prefix='bm318d-reel-'))
+dossier = Path(tempfile.mkdtemp(prefix='dioptre-reel-'))
 base = dossier / 'reel.sqlite3'
 workspaces = dossier / 'workspaces'
 port = port_libre()

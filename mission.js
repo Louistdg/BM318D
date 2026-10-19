@@ -149,7 +149,7 @@ async function ouvrirReglages(){
    +'<label>Modèle par défaut</label><input id="mcSetModel" value="'+esc(s.ollama_model)+'">'
    +'<label>Jobs simultanés (vide = selon la mémoire)</label><input id="mcSetJobs" value="'+esc(s.max_jobs)+'">'
    +'<label>Sauvegarde automatique (minutes, 0 = arrêtée)</label><input id="mcSetBackup" value="'+esc(s.auto_backup_minutes)+'">'
-   +'<label>Dossier local du projet (disque C: ou D:)</label><input id="mcSetWorkspace" value="'+esc(s.workspace_dir)+'" maxlength="1024" autocomplete="off"><p class="subtle">BM318d créera ici les dossiers du projet et de ses travaux. Les imports seront copiés dans cet espace ; l’original restera à son emplacement.</p><p class="subtle"><strong>À savoir :</strong> les sauvegardes BM318d couvrent la base SQLite, pas les fichiers importés. Inclue aussi ce dossier dans tes sauvegardes personnelles.</p>',async()=>{
+   +'<label>Dossier local du projet (disque C: ou D:)</label><input id="mcSetWorkspace" value="'+esc(s.workspace_dir)+'" maxlength="1024" autocomplete="off"><p class="subtle">DIOPTRE créera ici les dossiers du projet et de ses travaux. Les imports seront copiés dans cet espace ; l’original restera à son emplacement.</p><p class="subtle"><strong>À savoir :</strong> les sauvegardes DIOPTRE couvrent la base SQLite, pas les fichiers importés. Inclue aussi ce dossier dans tes sauvegardes personnelles.</p>',async()=>{
     const saisi=$('mcSetAdmin').value.trim();if(saisi)memoriserJeton(saisi);
     await post('settings',{key:'workspace_dir',value:$('mcSetWorkspace').value});
     await post('settings',{key:'ollama_url',value:$('mcSetUrl').value});

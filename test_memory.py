@@ -25,7 +25,7 @@ def ok(nom, condition, detail=''):
         print('  ECHEC ' + nom + (('  -> ' + str(detail)[:300]) if detail != '' else ''))
 
 
-dossier = Path(tempfile.mkdtemp(prefix='bm318d-memoire-'))
+dossier = Path(tempfile.mkdtemp(prefix='dioptre-memoire-'))
 mc.DB = dossier / 'memoire.sqlite3'
 with mc.connect() as c:
     c.execute('CREATE TABLE projects(id INTEGER PRIMARY KEY,name TEXT NOT NULL)')

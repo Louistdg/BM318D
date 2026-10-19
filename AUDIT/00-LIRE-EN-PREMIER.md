@@ -1,4 +1,4 @@
-# DIOPTRE / BM318D 2.5.3 — dossier d'audit
+# DIOPTRE / DIOPTRE 2.5.3 — dossier d'audit
 
 Merci de faire l'audit de cette application. Ce document dit ce qu'elle est,
 comment la lancer, ce qui est déjà vérifié, ce qui est fragile, et ce que
@@ -6,7 +6,7 @@ j'attends d'un audit sérieux.
 
 ## 1. En deux phrases
 
-DIOPTRE est le nom public d'un logiciel Windows (nom de code BM318D) qui
+DIOPTRE est le nom public d'un logiciel Windows (nom de code DIOPTRE) qui
 centralise projets, tâches, agents IA, documents et preuves, avec un assistant
 local. C'est une application **Python 3.14, bibliothèque standard uniquement**,
 qui sert une interface web sur `127.0.0.1:31880` et parle à **Ollama** en local.

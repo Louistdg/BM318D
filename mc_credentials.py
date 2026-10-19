@@ -1,4 +1,4 @@
-"""BM318d — coffre de clés.
+"""DIOPTRE — coffre de clés.
 
 Sous Windows : Windows Credential Manager (Advapi32), aucun repli en clair.
 Hors Windows : le module s'importe et échoue proprement à l'usage
@@ -14,7 +14,7 @@ MESSAGE_HORS_WINDOWS = 'Coffre Windows indisponible (hors Windows)'
 
 
 def target(connector_id):
-    return 'BM318d/V2.2/connector/' + uuid.UUID(str(connector_id)).hex
+    return 'DIOPTRE/V2.2/connector/' + uuid.UUID(str(connector_id)).hex
 
 
 if WINDOWS:
@@ -53,7 +53,7 @@ def put(connector_id, secret):
     raw = secret.encode('utf-16-le')
     blob = (ctypes.c_ubyte * len(raw)).from_buffer_copy(raw)
     cred = Credential(Type=1, TargetName=target(connector_id), CredentialBlobSize=len(raw),
-                      CredentialBlob=blob, Persist=2, UserName='BM318d')
+                      CredentialBlob=blob, Persist=2, UserName='DIOPTRE')
     if not api().CredWriteW(ctypes.byref(cred), 0):
         raise ValueError('Coffre Windows indisponible')
 

@@ -8,7 +8,7 @@ répond aux questions laissées ouvertes.
 
 ### Faible 1 — noms de modèles Ollama non échappés — **corrigé**
 
-`BM318d-Railway.html`, `chargerModeles()` : les noms passent maintenant par
+`DIOPTRE.html`, `chargerModeles()` : les noms passent maintenant par
 `escapeHtml` sur la valeur **et** sur le texte de l'option.
 
 ```js

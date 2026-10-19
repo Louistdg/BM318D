@@ -80,7 +80,7 @@ class CDP {
 // reel (aucune creation, aucun deplacement).
 const URL_IMPOSEE = process.env.MC_UI_URL || '';
 const LECTURE_SEULE = Boolean(URL_IMPOSEE);
-const dossier = fs.mkdtempSync(path.join(os.tmpdir(), 'bm318d-ui-'));
+const dossier = fs.mkdtempSync(path.join(os.tmpdir(), 'dioptre-ui-'));
 const base = path.join(dossier, 'ui.sqlite3');
 // Schema minimal + deux projets, comme une base de travail neuve.
 if (!LECTURE_SEULE) {

@@ -10,7 +10,7 @@ def linux_path(path):
 
 class SandboxV23(unittest.TestCase):
     def setUp(self):
-        self.tmp=tempfile.TemporaryDirectory(prefix='bm318d-v23-')
+        self.tmp=tempfile.TemporaryDirectory(prefix='dioptre-v23-')
         self.root=Path(self.tmp.name);self.workspace=self.root/'workspace';self.workspace.mkdir()
         self.outside=self.root/'outside-secret.txt';self.outside.write_text('synthetic-secret-only')
     def tearDown(self):self.tmp.cleanup()
@@ -33,12 +33,12 @@ print(json.dumps(results))'''
         self.assertTrue(all(x[1] for x in result),result)
         self.assertEqual(self.outside.read_text(),'synthetic-secret-only')
     def test_02_actual_child_environment(self):
-        os.environ['BM318D_V23_CANARY']='must-not-be-inherited'
+        os.environ['DIOPTRE_V23_CANARY']='must-not-be-inherited'
         try:r=self.run_code('import os,json;print(json.dumps(dict(os.environ)))')
-        finally:os.environ.pop('BM318D_V23_CANARY',None)
+        finally:os.environ.pop('DIOPTRE_V23_CANARY',None)
         self.assertEqual(r['HOME'],'/workspace');self.assertEqual(r['TEMP'],r['HOME'])
         self.assertEqual(r['PATH'],'/usr/bin:/bin')
-        self.assertFalse(set(r)&{'BM318D_V23_CANARY','WSL_INTEROP','WSLENV','SSH_AUTH_SOCK','MC_TOKEN','MC_ADMIN_TOKEN'})
+        self.assertFalse(set(r)&{'DIOPTRE_V23_CANARY','WSL_INTEROP','WSLENV','SSH_AUTH_SOCK','MC_TOKEN','MC_ADMIN_TOKEN'})
     def test_03_socket_families_blocked_at_os_level(self):
         code='''import socket,json
 results=[]
@@ -127,13 +127,13 @@ print(json.dumps(paths))''')
         ref=uuid.uuid4().hex
         if os.name=='nt':
             import mc_credentials
-            mc_credentials.put(ref,'BM318d-v23-synthetic-canary')
+            mc_credentials.put(ref,'DIOPTRE-v23-synthetic-canary')
         try:
             code='''import os,pathlib,ctypes,json
 r={'windows_loader':hasattr(ctypes,'WinDLL'),'interop':pathlib.Path('/init').exists(),'windows_mount':pathlib.Path('/mnt/c').exists(),'credentials':pathlib.Path.home().joinpath('.ssh').exists()}
 print(json.dumps(r))'''
             self.assertEqual(self.run_code(code),dict.fromkeys(('windows_loader','interop','windows_mount','credentials'),False))
-            if os.name=='nt':self.assertEqual(mc_credentials.get(ref),'BM318d-v23-synthetic-canary')
+            if os.name=='nt':self.assertEqual(mc_credentials.get(ref),'DIOPTRE-v23-synthetic-canary')
         finally:
             if os.name=='nt':mc_credentials.delete(ref)
 
@@ -219,7 +219,7 @@ print(json.dumps(r))'''
     def test_26_abrupt_parent_death_removes_untrusted_process(self):
         # The host observer only returns PIDs whose -c argument exactly matches
         # this synthetic command. It never terminates unrelated Linux processes.
-        code='import time;time.sleep(120) # bm318d-orphan-'+uuid.uuid4().hex
+        code='import time;time.sleep(120) # dioptre-orphan-'+uuid.uuid4().hex
         observer="""import os,pathlib,sys,json
 wanted=sys.argv[1].encode();found=[]
 for p in pathlib.Path('/proc').iterdir():

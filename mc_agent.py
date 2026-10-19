@@ -1,4 +1,4 @@
-"""BM318d — exécution contrôlée d'un job d'agent (P1).
+"""DIOPTRE — exécution contrôlée d'un job d'agent (P1).
 
 Aucune commande arbitraire, aucune écriture hors d'un workspace dédié.
 Ce module ne connaît ni HTTP ni SQLite : il reçoit une racine de workspace et
@@ -135,7 +135,7 @@ def appliquer(racine, fichiers):
     """Écrit les fichiers après approbation, par renommage atomique."""
     for chemin, contenu in fichiers:
         chemin.parent.mkdir(parents=True, exist_ok=True)
-        temporaire = chemin.with_name(chemin.name + '.tmp-bm318d')
+        temporaire = chemin.with_name(chemin.name + '.tmp-dioptre')
         temporaire.write_text(contenu, encoding='utf-8', newline='')
         os.replace(temporaire, chemin)
     return empreintes(racine, [c for c, _ in fichiers])

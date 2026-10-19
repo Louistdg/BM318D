@@ -1,12 +1,12 @@
-# Grok mission 01 — understand BM318D and review the product experience
+# Grok mission 01 — understand DIOPTRE and review the product experience
 
 ## Your role
 
-Act as an independent senior product designer and UX researcher reviewing BM318D. Your first job is to understand the existing product from this repository, then give a concrete, evidence-based product and interface critique. You are not being asked to implement anything in this mission.
+Act as an independent senior product designer and UX researcher reviewing DIOPTRE. Your first job is to understand the existing product from this repository, then give a concrete, evidence-based product and interface critique. You are not being asked to implement anything in this mission.
 
-## What BM318D is
+## What DIOPTRE is
 
-BM318D Control Center is a local-first Windows application for a person or small team managing AI-assisted software work. It combines desktop launchers and a local Python service with a web-based Mission Control interface. The product represents projects, agents and teams, missions and assignments, a visual canvas, project/agent context, handoffs, plans, jobs, reviews, and test evidence. It also contains local-model/provider connectors and security/sandbox code. The codebase includes both user-facing UI and server-side rules; the labels in a screen are not proof that the underlying operation is implemented or safe.
+DIOPTRE Control Center is a local-first Windows application for a person or small team managing AI-assisted software work. It combines desktop launchers and a local Python service with a web-based Mission Control interface. The product represents projects, agents and teams, missions and assignments, a visual canvas, project/agent context, handoffs, plans, jobs, reviews, and test evidence. It also contains local-model/provider connectors and security/sandbox code. The codebase includes both user-facing UI and server-side rules; the labels in a screen are not proof that the underlying operation is implemented or safe.
 
 The intended value is to make work by multiple AI agents understandable and reviewable: who is working on what, what has been proposed, what was actually tested, and what still needs human approval. The product is under active development, so distinguish current behavior from roadmap or incomplete behavior.
 
@@ -14,14 +14,14 @@ The intended value is to make work by multiple AI agents understandable and revi
 
 1. Map the repository and identify the main Windows entry points, local server, UI, styles, connector screens, security controls, and test files.
 2. Read `README.md`, `MISSION-CONTROL-LISEZMOI.txt`, `V2.2-IMPLEMENTATION.md`, and `docs/SECURITY-STATUS.md`. Treat descriptions in docs as claims to verify against source and tests.
-3. Trace the principal user journeys through `BM318d-Railway.html`, `mission.js`, `mission.css`, `connectors.js`, `MissionControl.py`, and `BM318d-WebServer.py`. Follow server/API behavior only as needed to understand the visible interaction.
+3. Trace the principal user journeys through `DIOPTRE.html`, `mission.js`, `mission.css`, `connectors.js`, `MissionControl.py`, and `DIOPTRE-WebServer.py`. Follow server/API behavior only as needed to understand the visible interaction.
 4. Inspect relevant tests to learn which UI and behaviors are actually exercised. If there are no screenshots or running app, say the review is source-based; do not claim visual runtime testing.
 
 ## What to review
 
 Review the product as a real user would, especially its visual design and interactivity:
 
-- Is it immediately clear what BM318D does and where a new user should begin?
+- Is it immediately clear what DIOPTRE does and where a new user should begin?
 - Is the navigation understandable as the product grows? Are features grouped around users’ goals rather than implementation history?
 - Can users understand the relationship between projects, agents, teams, missions, assignments, jobs, and plans?
 - Does the canvas communicate status, ownership, relationships, and next actions without clutter?
