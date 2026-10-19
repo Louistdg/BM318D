@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 
 import mc_agent
+import mc_documents
 from mc_actions import action
 
 _lie = False
@@ -45,6 +46,9 @@ def reglage_definir(c,p,d):
   if not cible.is_dir():raise ValueError('Le chemin choisi n’est pas un dossier')
   valeur=str(cible.resolve())
  c.execute('INSERT INTO mc_settings(project_id,key,value) VALUES(?,?,?) ON CONFLICT(project_id,key) DO UPDATE SET value=excluded.value',(p,cle,valeur))
+ if cle=='workspace_dir':
+  rattachees=mc_documents.reconcilier_racines(c,valeur)
+  if rattachees:audit(c,p,'workspace_reconcilie',{'fichiers':rattachees,'racine':valeur})
  if cle=='ollama_url' and valeur:mc_agent.OLLAMA=valeur
  if cle=='max_jobs':os.environ['MC_MAX_JOBS']=valeur
  audit(c,p,'setting_changed',{'key':cle});return {'key':cle,'value':valeur}

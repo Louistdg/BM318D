@@ -311,6 +311,24 @@ class Documents(unittest.TestCase):
         self.assertIn('escapeHtml(m)', page)
         self.assertNotIn("'<option value=\"'+m+'\">'+m+'</option>'", page)
 
+    def test_changement_de_workspace_rattache_les_fiches(self):
+        """storage_root suit le fichier quand le workspace change et que le fichier a suivi."""
+        ancien = Path(_temp.name) / 'ws-ancien'
+        nouveau = Path(_temp.name) / 'ws-nouveau'
+        with mc.connect() as c:
+            item = mc_documents.import_file(c, 1, {'name': 'suivi.txt',
+                'data': base64.b64encode(b'suivi').decode()}, ancien)['item']
+            relatif = item['storage_path']
+            montrer = (nouveau / relatif)
+            montrer.parent.mkdir(parents=True, exist_ok=True)
+            montrer.write_bytes(b'suivi')
+            (ancien / relatif).unlink()
+            rattachees = mc_documents.reconcilier_racines(c, nouveau)
+        self.assertEqual(rattachees, 1)
+        with mc.connect() as c:
+            ligne = c.execute('SELECT storage_root FROM mc_documents WHERE id=?', (item['id'],)).fetchone()
+        self.assertEqual(Path(ligne[0]), nouveau.resolve())
+
 
 if __name__ == '__main__':
     unittest.main()
