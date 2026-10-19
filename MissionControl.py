@@ -48,6 +48,29 @@ def connect():
  c.execute('PRAGMA foreign_keys=ON')
  c.execute('PRAGMA busy_timeout=20000')
  return c
+def action(nom, job_arg=False, payload_arg=None):
+ """Declare qu'une fonction sert une action protegee.
+
+ Remplace l'ancien _guard_function : plus d'inspection de signature ni de
+ rebinding dans globals(), chaque fonction dit elle-meme ce qu'elle exige.
+ """
+ def enveloppe(fonction):
+  signature=inspect.signature(fonction)
+  noms=list(signature.parameters)[2:]
+  @functools.wraps(fonction)
+  def garde(c,p,*args,**kwargs):
+   lies=signature.bind(c,p,*args,**kwargs);lies.apply_defaults()
+   donnees=lies.arguments.get(noms[payload_arg],{}) if payload_arg is not None else {}
+   donnees=donnees or {}
+   travail=lies.arguments.get(noms[0]) if job_arg else None
+   if nom in ('validate','commit','review'):
+    travail=donnees.get('job_id') or donnees.get('id')
+   mc_security.require(c,p,nom,donnees,travail)
+   return fonction(c,p,*args,**kwargs)
+  garde.action_mc=nom
+  return garde
+ return enveloppe
+
 def init():
  # Create legacy canvas tables on a clean install, preserving existing rows.
  with connect() as c:
@@ -256,6 +279,7 @@ def journal(c,i,ligne):
 def job_publie(c,p,i):
  return one(c,'SELECT * FROM mc_jobs WHERE project_id=? AND id=?',(p,i))
 
+@action('job_create',payload_arg=0)
 def job_creer(c,p,d):
  a=agent(c,p,int(d['agent_id']))
  titre=required_text(d,'title',160);tache=required_text(d,'task',5000)
@@ -281,6 +305,7 @@ def job_creer(c,p,d):
  audit(c,p,'job_created',{'id':job,'agent':a['id'],'title':titre})
  return {'id':job,'workspace':str(racine),'model':modele}
 
+@action('job_run',job_arg=True)
 def job_lancer(c,p,i):
  j=job_publie(c,p,i)
  if j['status'] not in ('queued','failed','cancelled','blocked'):raise ValueError('Ce job ne peut pas être relancé ('+j['status']+')')
@@ -302,6 +327,7 @@ def job_lancer(c,p,i):
  threading.Thread(target=contextvars.copy_context().run,args=(job_en_arriere,i),daemon=True).start()
  return {'ok':True,'id':i}
 
+@action('job_control',job_arg=True)
 def job_pause(c,p,i):
  j=job_publie(c,p,i)
  if j['status']=='proposed':
@@ -316,6 +342,7 @@ def job_pause(c,p,i):
   return {'paused':False,'demandee':True}
  raise ValueError('Ce job ne peut pas être mis en pause ('+j['status']+')')
 
+@action('job_control',job_arg=True)
 def job_reprendre(c,p,i):
  j=job_publie(c,p,i)
  if j['status']!='paused':raise ValueError('Ce job n’est pas en pause ('+j['status']+')')
@@ -385,6 +412,7 @@ def job_executer(i,genere=None):
   with _verrous:_annulations.discard(i);_pauses.discard(i)
   return {'status':statut,'error':str(e)}
 
+@action('approve',job_arg=True,payload_arg=1)
 def job_approuver(c,p,i,d=None):
  acteur(c,p,d or {},'can_approve_jobs')
  j=job_publie(c,p,i)
@@ -397,6 +425,7 @@ def job_approuver(c,p,i,d=None):
  audit(c,p,'job_approved',{'id':i,'fichiers':[e['path'] for e in ecrits]})
  return {'fichiers':ecrits}
 
+@action('approve',job_arg=True,payload_arg=1)
 def job_refuser(c,p,i,d):
  j=job_publie(c,p,i)
  if j['status'] not in ('proposed','paused'):raise ValueError('On ne refuse pas un travail déjà appliqué ('+j['status']+') : utilisez git ou la restauration')
@@ -406,6 +435,7 @@ def job_refuser(c,p,i,d):
  audit(c,p,'job_rejected',{'id':i,'raison':motif[:300]})
  return {'ok':True}
 
+@action('job_control',job_arg=True)
 def job_annuler(c,p,i):
  j=job_publie(c,p,i)
  if j['status'] in ('approved','completed'):raise ValueError('Job déjà appliqué : on ne l’annule plus')
@@ -421,6 +451,7 @@ def auteur_preuve():
  if identite.kind=='agent' and identite.agent:return 'agent:%d'%identite.agent
  return identite.kind
 
+@action('test',job_arg=True,payload_arg=1)
 def job_tester(c,p,i,d):
  acteur(c,p,d,'can_run_tests')
  j=job_publie(c,p,i)
@@ -456,6 +487,7 @@ def job_tester(c,p,i,d):
  return {'evidence':resultat,'status':statut}
 
 # --- P5 : revue, validation, commit, rapport --------------------------------
+@action('review',payload_arg=0)
 def review_creer(c,p,d):
  j=job_publie(c,p,int(d['job_id']))
  if j['status'] not in ('approved','completed'):raise ValueError('On ne révise qu’un travail déjà appliqué')
@@ -475,6 +507,7 @@ def review_creer(c,p,d):
  audit(c,p,'review_recorded',{'id':cur.lastrowid,'job':j['id'],'kind':kind,'verdict':verdict})
  return {'id':cur.lastrowid,'verdict':verdict,'findings':constats}
 
+@action('validate',payload_arg=0)
 def job_valider(c,p,d):
  acteur(c,p,d,'can_approve_jobs')
  j=job_publie(c,p,int(d['id']))
@@ -511,6 +544,7 @@ def job_valider(c,p,d):
  audit(c,p,'job_validated',{'id':j['id'],'revues':[r['kind'] for r in revues]})
  return {'ok':True,'verification':'validated'}
 
+@action('commit',payload_arg=0)
 def job_commit(c,p,d):
  acteur(c,p,d,'can_approve_jobs')
  j=job_publie(c,p,int(d['id']))
@@ -542,6 +576,7 @@ def roles_projet(c,p):
 def role_valide(c,p,role):
  return any(r['key']==role for r in roles_projet(c,p))
 
+@action('admin',payload_arg=0)
 def role_creer(c,p,d):
  cle=required_text(d,'key',40)
  if cle in ROLES:raise ValueError('Ce rôle existe déjà dans la bibliothèque de base')
@@ -563,11 +598,13 @@ def permissions_lire(c,p):
   can_approve_jobs=permission(c,p,e['team'],'can_approve_jobs'),
   can_run_tests=permission(c,p,e['team'],'can_run_tests')) for e in equipes]
 
+@action('admin',payload_arg=0)
 def permissions_definir(c,p,d):
  equipe=required_text(d,'team',80)
  c.execute('INSERT INTO mc_team_permissions(project_id,team,can_create_agents,can_approve_jobs,can_run_tests) VALUES(?,?,?,?,?) ON CONFLICT(project_id,team) DO UPDATE SET can_create_agents=excluded.can_create_agents,can_approve_jobs=excluded.can_approve_jobs,can_run_tests=excluded.can_run_tests',(p,equipe,int(bool(d.get('can_create_agents',True))),int(bool(d.get('can_approve_jobs',True))),int(bool(d.get('can_run_tests',True)))))
  audit(c,p,'team_permissions',{'team':equipe});return {'ok':True}
 
+@action('manage',payload_arg=0)
 def branche_creer(c,p,d):
  nom=required_text(d,'name',80)
  architecte=d.get('architect_id');architecte=int(architecte) if architecte not in ('',None) else None
@@ -575,6 +612,7 @@ def branche_creer(c,p,d):
  cur=c.execute('INSERT INTO mc_branches(project_id,name,architect_id,description) VALUES(?,?,?,?)',(p,nom,architecte,str(d.get('description',''))[:400]))
  audit(c,p,'branch_created',{'id':cur.lastrowid,'name':nom});return {'id':cur.lastrowid}
 
+@action('manage',payload_arg=0)
 def branche_modifier(c,p,d):
  b=one(c,'SELECT * FROM mc_branches WHERE project_id=? AND id=?',(p,int(d['id'])))
  updates={}
@@ -602,12 +640,14 @@ def acteur(c,p,d,action=None):
   raise ValueError('L’équipe '+a['team']+' n’a pas le droit : '+action)
  return a
 
+@action('manage',payload_arg=0)
 def agent_clone(c,p,d):
  source=agent(c,p,int(d['id']))
  nom=str(d.get('name') or (source['name']+' (copie)'))[:100]
  cur=c.execute('INSERT INTO mc_agents(project_id,name,role,team,manager_id,status,model,instructions,x,y) VALUES(?,?,?,?,?,?,?,?,?,?)',(p,nom,source['role'],source['team'],source['manager_id'],'idle',source['model'],source['instructions'],source['x']+60,source['y']+60))
  audit(c,p,'agent_cloned',{'source':source['id'],'id':cur.lastrowid});return {'id':cur.lastrowid,'name':nom}
 
+@action('manage',payload_arg=0)
 def recrue_creer(c,p,d):
  role=required_text(d,'role',40)
  if not role_valide(c,p,role):raise ValueError('Rôle inconnu')
@@ -619,6 +659,7 @@ def recrue_creer(c,p,d):
  audit(c,p,'recruit_requested',{'id':cur.lastrowid,'name':nom,'role':role})
  return {'id':cur.lastrowid,'status':'pending'}
 
+@action('admin',payload_arg=0)
 def recrue_decider(c,p,d):
  recrue=one(c,'SELECT * FROM mc_recruits WHERE project_id=? AND id=?',(p,int(d['id'])))
  if recrue['status']!='pending':raise ValueError('Recrutement déjà tranché ('+recrue['status']+')')
@@ -637,6 +678,7 @@ def recrue_decider(c,p,d):
  audit(c,p,'recruit_rejected',{'id':recrue['id']})
  return {'status':'rejected'}
 
+@action('manage',payload_arg=0)
 def agent_archiver(c,p,d):
  a=agent(c,p,int(d['id']))
  c.execute("UPDATE mc_agents SET status='archived' WHERE id=?",(a['id'],))
@@ -655,6 +697,7 @@ SYSTEME_PLAN=(
 def charge_par_agent(c,p):
  return {r['agent_id']:r['n'] for r in rows(c,"SELECT agent_id,count(*) AS n FROM mc_jobs WHERE project_id=? AND status IN ('queued','running','paused','proposed') GROUP BY agent_id",(p,))}
 
+@action('manage',payload_arg=0)
 def plan_proposer(c,p,d,genere=None):
  genere=genere or (lambda modele,tache,contexte:mc_agent.generer_ollama(modele,SYSTEME_PLAN,tache,contexte))
  objectif=required_text(d,'objective',2000)
@@ -676,6 +719,7 @@ def plan_proposer(c,p,d,genere=None):
  audit(c,p,'plan_proposed',{'id':plan_id,'taches':len(plan['tasks']),'sans_agent':manquants})
  return {'id':plan_id,'plan':plan,'assignations':affectations,'roles_sans_agent':manquants}
 
+@action('manage',payload_arg=0)
 def plan_appliquer(c,p,d):
  plan_id=int(d['id'])
  ligne=one(c,'SELECT * FROM mc_plans WHERE project_id=? AND id=?',(p,plan_id))
@@ -694,6 +738,7 @@ def plan_appliquer(c,p,d):
  audit(c,p,'plan_applied',{'id':plan_id,'jobs':list(ids.values())})
  return {'jobs':ids}
 
+@action('manage',payload_arg=0)
 def orchestrateur_lancer(c,p,d):
  limite=mc_plan.executions_simultanees()
  en_cours=len(rows(c,"SELECT id FROM mc_jobs WHERE project_id=? AND status='running'",(p,)))
@@ -764,6 +809,7 @@ def reglages(c,p):
  for ligne in rows(c,'SELECT key,value FROM mc_settings WHERE project_id=?',(p,)):valeurs[ligne['key']]=ligne['value']
  return valeurs
 
+@action('admin',payload_arg=0)
 def reglage_definir(c,p,d):
  cle=required_text(d,'key',40)
  if cle not in REGLAGES_DEFAUT:raise ValueError('Réglage inconnu : '+cle)
@@ -808,6 +854,7 @@ def historique(c,p,limite=80):
 
 def sauvegardes_disponibles():
  return mc_backups.disponibles(ROOT)
+@action('admin',payload_arg=0)
 def restaurer_sauvegarde(c,p,d):
  return mc_backups.restaurer(c,p,d,racine=ROOT,base=DB,audit=audit,init=init)
 def demander_arret():
@@ -1025,36 +1072,6 @@ def dispatch(c,path,d,principal=None):
  with mc_security.use(identity):
   mc_security.authorize_route(c,path,d)
   return _dispatch(c,path,d)
-
-def _guard_function(function,action,job_arg=False,payload_arg=None):
- signature=inspect.signature(function)
- names=list(signature.parameters)[2:]
- @functools.wraps(function)
- def guarded(c,p,*args,**kwargs):
-  bound=signature.bind(c,p,*args,**kwargs);bound.apply_defaults()
-  data=bound.arguments.get(names[payload_arg],{}) if payload_arg is not None else {}
-  data=data or {}
-  job=bound.arguments.get(names[0]) if job_arg else None
-  if action in ('validate','commit','review'):job=data.get('job_id') or data.get('id')
-  mc_security.require(c,p,action,data,job)
-  return function(c,p,*args,**kwargs)
- return guarded
-
-# Direct Python calls are privileged broker entry points too, not bypasses.
-for _name,_action,_job,_payload in (
- ('job_creer','job_create',False,0),('job_lancer','job_run',True,None),
- ('job_pause','job_control',True,None),('job_reprendre','job_control',True,None),
- ('job_annuler','job_control',True,None),('job_refuser','approve',True,1),
- ('job_approuver','approve',True,1),('job_tester','test',True,1),
- ('job_valider','validate',False,0),('job_commit','commit',False,0),
- ('review_creer','review',False,0),('permissions_definir','admin',False,0),
- ('reglage_definir','admin',False,0),('restaurer_sauvegarde','admin',False,0),
- ('role_creer','admin',False,0),('recrue_decider','admin',False,0),
- ('agent_clone','manage',False,0),('agent_archiver','manage',False,0),
- ('branche_creer','manage',False,0),('branche_modifier','manage',False,0),
- ('plan_proposer','manage',False,0),('plan_appliquer','manage',False,0),
- ('orchestrateur_lancer','manage',False,0),('recrue_creer','manage',False,0)):
- globals()[_name]=_guard_function(globals()[_name],_action,_job,_payload)
 
 class Handler(http.server.BaseHTTPRequestHandler):
  def log_message(self,*a):pass
