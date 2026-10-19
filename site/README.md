@@ -15,9 +15,14 @@ sitemap.xml       deux URL : / et /installation.html
 assets/02-mission-control.jpg   image de partage (og:image)
 ```
 
-L'installateur Windows (`DIOPTRE-Setup-2.5.3.exe`, 2 Mo) n'est pas versionné :
+L'installateur Windows (`DIOPTRE-Setup-2.5.4.exe`, 2 Mo) n'est pas versionné :
 un binaire de cette taille n'a pas sa place dans Git. Il est publié sur le
 serveur, dans `telechargements/`, et reconstruit par `installer/DIOPTRE.iss`.
+
+Empreinte publiee sur la page d'accueil :
+
+    DIOPTRE-Setup-2.5.4.exe   2 143 732 octets
+    SHA-256 229b368253e48eb18a96a8eee834097a5ef6df1d3f273d89b69bb3c1f6188f9a
 
 ## Comment le site est construit
 
