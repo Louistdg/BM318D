@@ -1,15 +1,14 @@
 """DIOPTRE Mission Control: isolated, additive service on 127.0.0.1:31880."""
-import http.server,importlib.util,json,sqlite3,shutil,datetime,threading,os,secrets,time,re
+import http.server,json,sqlite3,shutil,datetime,threading,os,secrets,time,re
 from pathlib import Path
 import mc_agent
 import mc_plan
 import mc_connectors
 import mc_security
 import mc_documents
+import mc_legacy
 import contextvars,functools,inspect
 ROOT=Path(__file__).resolve().parent
-spec=importlib.util.spec_from_file_location('legacy',ROOT/'DIOPTRE-WebServer.py')
-legacy=importlib.util.module_from_spec(spec);spec.loader.exec_module(legacy)
 # Base et port surchargeables : les tests d'integration tournent sur une copie
 # temporaire, jamais sur la base de travail.
 
@@ -1104,7 +1103,13 @@ for _name,_action,_job,_payload in (
  ('orchestrateur_lancer','manage',False,0),('recrue_creer','manage',False,0)):
  globals()[_name]=_guard_function(globals()[_name],_action,_job,_payload)
 
-class Handler(legacy.Handler):
+class Handler(http.server.BaseHTTPRequestHandler):
+ def log_message(self,*a):pass
+ def reply(self,data,code=200):
+  b=json.dumps(data,ensure_ascii=False).encode()
+  self.send_response(code);self.send_header('Content-Type','application/json; charset=utf-8')
+  self.send_header('Content-Length',str(len(b)));self.send_header('Cache-Control','no-store')
+  self.end_headers();self.wfile.write(b)
  # --- securite commune a toutes les routes ---
  def _hote_ok(self):
   return (self.headers.get('Host') or '').strip() in ('127.0.0.1:%d'%PORT,'localhost:%d'%PORT)
@@ -1262,10 +1267,13 @@ class Handler(legacy.Handler):
      with connect() as c:self.reply(job_publie(c,p,i))
     except (ValueError,KeyError) as e:self.reply({'error':str(e)},400)
     return
-   super().do_GET();return
-  super().do_GET()
+   if self.path=='/api/state':
+    with connect() as c:self.reply(mc_legacy.etat(c))
+    return
+   self._refus(404,'Route inconnue');return
+  self._refus(404,'Route inconnue')
  def do_POST(self):
-  if not (self.path.startswith('/api/') or self.path=='/event'):return super().do_POST()
+  if not (self.path.startswith('/api/') or self.path=='/event'):return self._refus(404,'Route inconnue')
   # Le corps est lu avant tout refus : sinon la fermeture de la connexion avec
   # des octets non lus fait perdre la reponse au client (RST sous Windows).
   try:n=int(self.headers.get('Content-Length','0'))
@@ -1284,10 +1292,20 @@ class Handler(legacy.Handler):
   if not self.path.startswith('/api/mc/'):
    # Anciennes routes (/api/task, /api/event...) : le corps a deja ete lu, on le
    # remet a disposition du gestionnaire historique.
-   import io
    if self.principal.kind=='agent':return self._refus(403,'Route historique non autorisée aux agents')
-   self.rfile=io.BytesIO(corps)
-   return super().do_POST()
+   fonction=mc_legacy.ROUTES_POST.get(self.path)
+   if fonction is None:return self._refus(404,'Route inconnue')
+   try:
+    if not corps:raise ValueError('Corps vide')
+    d=json.loads(corps)
+    if not isinstance(d,dict):raise ValueError('Corps JSON invalide')
+    if self.path=='/api/ollama':
+     with connect() as c:result=fonction(c,d)
+     self.reply(result);return
+    with LOCK,connect() as c:result=fonction(c,d)
+    self.reply({'ok':True,**result},201);return
+   except PermissionError as e:self.reply({'error':str(e)},403);return
+   except (ValueError,KeyError,TypeError,sqlite3.Error) as e:self.reply({'error':str(e)},400);return
   try:
    if not corps:raise ValueError('Corps vide')
    d=json.loads(corps)

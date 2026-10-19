@@ -1,5 +1,5 @@
 @echo off
-rem Ancien raccourci : il lancait DIOPTRE-WebServer.py sur 31879, sans authentification.
+rem Ce raccourci lance le serveur unique et authentifie (31880).
 rem Il lance maintenant MissionControl.py, le serveur protege, sur 31880.
 cd /d "%~dp0"
 start "DIOPTRE Mission Control" /min python "%~dp0MissionControl.py"

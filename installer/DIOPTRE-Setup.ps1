@@ -9,8 +9,7 @@ $ErrorActionPreference = 'Stop'
 $source = Split-Path -Parent $PSScriptRoot
 New-Item -ItemType Directory -Force -Path $TargetDir | Out-Null
 
-$fichiers = @('MissionControl.py','mc_agent.py','mc_plan.py','mc_sandbox.py','mc_sandbox_wsl.py','mc_sandbox_linux.py','mc_security.py','mc_connectors.py','mc_credentials.py','mc_documents.py','DIOPTRE-WebServer.py',
-              'DIOPTRE.html','mission.js','mission.css','connectors.js','security-ui.js','workspace.js','workspace.css','installer\version.json',
+$fichiers = @('MissionControl.py','mc_agent.py','mc_plan.py','mc_sandbox.py','mc_sandbox_wsl.py','mc_sandbox_linux.py','mc_security.py','mc_connectors.py','mc_credentials.py','mc_documents.py','DIOPTRE.html','mission.js','mission.css','connectors.js','security-ui.js','workspace.js','workspace.css','installer\version.json',
               'DIOPTRE-Controleur.pyw','DIOPTRE-Stop.py','LANCER-DIOPTRE-RAILWAY.cmd','requirements-v22.txt',
               'README.md','DIOPTRE-LISEZMOI.txt','docs\DELIVERY-V25-HOTFIX.md','docs\SECURITY-STATUS.md','mc_demo.py')
 $copies = 0
