@@ -147,11 +147,11 @@ try:
     ok('corps trop gros -> 413', code == 413, (code, corps[:120]))
     code, corps, _ = appeler(base_url + '/api/ollama', 'POST',
                              {'project': 999, 'prompt': 'x' * 20000}, auth)
-    ok('chat accepte un corps de plus de 16 Ko puis valide le projet', code == 400 and 'Invalid prompt' in corps, (code, corps[:120]))
+    ok('chat accepte un corps de plus de 16 Ko puis valide le projet', code == 400 and 'Prompt invalide' in corps, (code, corps[:120]))
     code, corps, _ = appeler(base_url + '/api/ollama', 'POST',
                              {'project': 999, 'prompt': 'é' * 120000}, auth)
     ok('chat transporte 120 000 caractères Unicode sans troncature',
-       code == 400 and 'Invalid prompt' in corps, (code, corps[:120]))
+       code == 400 and 'Prompt invalide' in corps, (code, corps[:120]))
     code, corps, _ = appeler(base_url + '/api/ollama', 'POST',
                              {'project': 999, 'prompt': 'é' * 120001}, auth)
     ok('chat refuse explicitement 120 001 caractères',

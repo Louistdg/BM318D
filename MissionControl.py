@@ -1,15 +1,20 @@
 """DIOPTRE Mission Control: isolated, additive service on 127.0.0.1:31880."""
-import http.server,importlib.util,json,sqlite3,shutil,datetime,threading,os,secrets,time,re
+import http.server,json,sqlite3,shutil,datetime,threading,os,secrets,time,re
 from pathlib import Path
 import mc_agent
 import mc_plan
 import mc_connectors
 import mc_security
 import mc_documents
+import mc_legacy
+import mc_backups
+import mc_missions
+import mc_jobs
+from mc_actions import action
+import mc_routes
+import sys
 import contextvars,functools,inspect
 ROOT=Path(__file__).resolve().parent
-spec=importlib.util.spec_from_file_location('legacy',ROOT/'DIOPTRE-WebServer.py')
-legacy=importlib.util.module_from_spec(spec);spec.loader.exec_module(legacy)
 # Base et port surchargeables : les tests d'integration tournent sur une copie
 # temporaire, jamais sur la base de travail.
 
@@ -191,19 +196,7 @@ def init():
   mc_documents.migrate(c)
 
 def sauvegarder(destination=None, *, inclure_imports=True):
- # Copie en ligne (API backup de SQLite) : coherente meme si le serveur ecrit.
- if not DB.is_file():return None
- destination=Path(destination) if destination else ROOT/'backups'/('dioptre-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.sqlite3')
- destination.parent.mkdir(parents=True,exist_ok=True)
- source=sqlite3.connect(DB,timeout=20)
- try:
-  cible=sqlite3.connect(destination)
-  try:source.backup(cible)
-  finally:cible.close()
- finally:source.close()
- if inclure_imports:
-  mc_documents.backup_imports(destination,destination.with_suffix('.imports.zip'))
- return destination
+ return mc_backups.sauvegarder(ROOT,DB,destination,inclure_imports=inclure_imports)
 def rows(c,q,a=()):
  return [dict(r) for r in c.execute(q,a).fetchall()]
 def one(c,q,a=()):
@@ -265,286 +258,6 @@ def journal(c,i,ligne):
  horodatage=datetime.datetime.now().strftime('%H:%M:%S')
  c.execute("UPDATE mc_jobs SET log=substr(log||?,1,20000) WHERE id=?",('['+horodatage+'] '+ligne+'\n',i))
 
-def job_publie(c,p,i):
- return one(c,'SELECT * FROM mc_jobs WHERE project_id=? AND id=?',(p,i))
-
-def job_creer(c,p,d):
- a=agent(c,p,int(d['agent_id']))
- titre=required_text(d,'title',160);tache=required_text(d,'task',5000)
- mission=d.get('mission_id');mission=int(mission) if mission not in ('',None) else None
- if mission is not None:one(c,'SELECT * FROM mc_missions WHERE project_id=? AND id=?',(p,mission))
- attribution=d.get('assignment_id');attribution=int(attribution) if attribution not in ('',None) else None
- if attribution is not None:
-  ligne=one(c,'SELECT a.*,m.project_id AS projet FROM mc_assignments a JOIN mc_missions m ON m.id=a.mission_id WHERE a.id=? AND m.project_id=?',(attribution,p))
-  if ligne['agent_id']!=a['id']:
-   raise ValueError('L’attribution %d ne concerne pas cet agent'%attribution)
-  if mission is not None and ligne['mission_id']!=mission:
-   raise ValueError('L’attribution %d n’appartient pas à la mission %d'%(attribution,mission))
- depend=d.get('depends_on');depend=int(depend) if depend not in ('',None) else None
- branche=d.get('branch_id');branche=int(branche) if branche not in ('',None) else None
- if branche is not None:one(c,'SELECT * FROM mc_branches WHERE project_id=? AND id=?',(p,branche))
- if depend is not None:job_publie(c,p,depend)
- modele=str(d.get('model') or a['model']).strip()[:80] or a['model']
- cur=c.execute('INSERT INTO mc_jobs(project_id,agent_id,mission_id,assignment_id,title,task,model,depends_on,branch_id) VALUES(?,?,?,?,?,?,?,?,?)',(p,a['id'],mission,attribution,titre,tache,modele,depend,branche))
- job=cur.lastrowid
- racine=mc_agent.racine_workspace(p,a['id'],job,reglages(c,p).get('workspace_dir'))
- c.execute('UPDATE mc_jobs SET workspace=? WHERE id=?',(str(racine),job))
- journal(c,job,'créé · agent %s · modèle %s'%(a['name'],modele))
- audit(c,p,'job_created',{'id':job,'agent':a['id'],'title':titre})
- return {'id':job,'workspace':str(racine),'model':modele}
-
-def job_lancer(c,p,i):
- j=job_publie(c,p,i)
- if j['status'] not in ('queued','failed','cancelled','blocked'):raise ValueError('Ce job ne peut pas être relancé ('+j['status']+')')
- if j['depends_on'] or rows(c,'SELECT 1 FROM mc_job_deps WHERE job_id=?',(i,)):
-  dependances=[r['depends_on'] for r in rows(c,'SELECT depends_on FROM mc_job_deps WHERE job_id=?',(i,))]
-  if j['depends_on'] and j['depends_on'] not in dependances:dependances.append(j['depends_on'])
-  for dep_id in dependances:
-   try:dependance=job_publie(c,p,dep_id)
-   except ValueError:dependance=None
-   if not dependance or dependance['status'] not in ('approved','completed'):
-    c.execute("UPDATE mc_jobs SET status='blocked',error=? WHERE id=?",('Dépendance non approuvée (job %s : %s)'%(dep_id,dependance['status'] if dependance else 'introuvable'),i))
-    journal(c,i,'bloqué : dépendance %s non approuvée'%dep_id)
-    audit(c,p,'job_blocked',{'id':i,'depends_on':dep_id})
-    return {'bloque':True,'id':i}
- with _verrous:_annulations.discard(i);_pauses.discard(i)
- c.execute("UPDATE mc_jobs SET status='queued',error='',finished_at=NULL WHERE id=?",(i,))
- journal(c,i,'en file')
- audit(c,p,'job_queued',{'id':i})
- threading.Thread(target=contextvars.copy_context().run,args=(job_en_arriere,i),daemon=True).start()
- return {'ok':True,'id':i}
-
-def job_pause(c,p,i):
- j=job_publie(c,p,i)
- if j['status']=='proposed':
-  c.execute("UPDATE mc_jobs SET status='paused' WHERE id=?",(i,))
-  journal(c,i,'en pause (proposition en attente)')
-  audit(c,p,'job_paused',{'id':i})
-  return {'paused':True}
- if j['status']=='running':
-  with _verrous:_pauses.add(i)
-  journal(c,i,'pause demandée : appliquée à la fin de l’étape en cours')
-  audit(c,p,'job_pause_demandee',{'id':i})
-  return {'paused':False,'demandee':True}
- raise ValueError('Ce job ne peut pas être mis en pause ('+j['status']+')')
-
-def job_reprendre(c,p,i):
- j=job_publie(c,p,i)
- if j['status']!='paused':raise ValueError('Ce job n’est pas en pause ('+j['status']+')')
- _pauses.discard(i)
- if (j['proposal'] or '').strip():
-  c.execute("UPDATE mc_jobs SET status='proposed' WHERE id=?",(i,))
-  journal(c,i,'reprise : la proposition déjà reçue est disponible')
-  return {'status':'proposed'}
- c.execute("UPDATE mc_jobs SET status='queued',finished_at=NULL WHERE id=?",(i,))
- journal(c,i,'reprise : appel du modèle')
- threading.Thread(target=contextvars.copy_context().run,args=(job_en_arriere,i),daemon=True).start()
- return {'status':'queued'}
-
-def job_en_arriere(i,genere=None):
- with connect() as authorization:
-  bound=one(authorization,'SELECT project_id FROM mc_jobs WHERE id=?',(i,))
-  mc_security.require(authorization,bound['project_id'],'job_run',job=i)
- try:job_executer(i,genere)
- except Exception as e:
-  with LOCK,connect() as c:
-   c.execute("UPDATE mc_jobs SET status='failed',error=?,finished_at=CURRENT_TIMESTAMP WHERE id=? AND status='running'",(str(e)[:2000],i))
-   journal(c,i,'échec : '+str(e)[:300])
-
-def job_executer(i,genere=None):
- with connect() as authorization:
-  bound=one(authorization,'SELECT project_id FROM mc_jobs WHERE id=?',(i,))
-  mc_security.require(authorization,bound['project_id'],'job_run',job=i)
- injecte=genere is not None
- with LOCK,connect() as c:
-  j=one(c,'SELECT * FROM mc_jobs WHERE id=?',(i,))
-  pris=c.execute("UPDATE mc_jobs SET status='running',started_at=CURRENT_TIMESTAMP,error='' WHERE id=? AND status IN ('queued','blocked')",(i,)).rowcount
-  if pris!=1:
-   return {'status':'deja_pris','id':i}
-  journal(c,i,'exécution · modèle %s'%j['model'])
-  audit(c,j['project_id'],'job_started',{'id':i})
- racine=Path(j['workspace'])
- try:
-  with LOCK,connect() as c:contexte=json.dumps(context_packet(c,j['project_id'],j['agent_id']),ensure_ascii=False)
-  existant=mc_agent.lire_contexte(racine)
-  if existant:contexte+='\n\nFichiers autorisés déjà présents dans le workspace:\n'+existant
-  if injecte:proposition=genere(j['model'],j['task'],contexte)
-  else:
-   with connect() as provider_db:
-    proposition=mc_connectors.generate(provider_db,j['project_id'],j['agent_id'],mc_agent.SYSTEME,j['task']+'\n\nContexte:\n'+contexte)
-   if proposition is None:proposition=mc_agent.generer_ollama(j['model'],mc_agent.SYSTEME,j['task'],contexte)
-  with _verrous:annule=i in _annulations
-  if annule:raise mc_agent.Refus('Job annulé avant proposition')
-  with connect() as authorization:mc_security.require(authorization,j['project_id'],'job_run',job=i)
-  fichiers=mc_agent.valider_proposition(racine,proposition)
-  difference=mc_agent.diff(racine,fichiers)
-  with _verrous:en_pause=i in _pauses;_pauses.discard(i)
-  statut='paused' if en_pause else 'proposed'
-  with LOCK,connect() as c:
-   texte_proposition=json.dumps(proposition,ensure_ascii=False)
-   if len(texte_proposition)>MAX_TEXTE:raise ValueError('Proposition trop volumineuse (%d caractères, maximum %d) : rien n’a été enregistré'%(len(texte_proposition),MAX_TEXTE))
-   if len(difference)>MAX_TEXTE:raise ValueError('Diff trop volumineux (%d caractères, maximum %d) : rien n’a été enregistré'%(len(difference),MAX_TEXTE))
-   c.execute("UPDATE mc_jobs SET status=?,proposal=?,diff=? WHERE id=? AND status='running'",(statut,texte_proposition,difference,i))
-   journal(c,i,'%s : %d fichier(s) · %s'%('proposition' if statut=='proposed' else 'pause',len(fichiers),', '.join(str(f[0].relative_to(racine)) for f in fichiers)[:300]))
-   audit(c,j['project_id'],'job_'+statut,{'id':i,'fichiers':[str(f[0].relative_to(racine)) for f in fichiers]})
-  return {'status':statut}
- except Exception as e:
-  with LOCK,connect() as c:
-   statut='cancelled' if i in _annulations else 'failed'
-   c.execute("UPDATE mc_jobs SET status=?,error=?,finished_at=CURRENT_TIMESTAMP WHERE id=? AND status='running'",(statut,str(e)[:2000],i))
-   journal(c,i,statut+' : '+str(e)[:300])
-   audit(c,j['project_id'],'job_'+statut,{'id':i,'error':str(e)[:500]})
-  with _verrous:_annulations.discard(i);_pauses.discard(i)
-  return {'status':statut,'error':str(e)}
-
-def job_approuver(c,p,i,d=None):
- acteur(c,p,d or {},'can_approve_jobs')
- j=job_publie(c,p,i)
- if j['status']!='proposed':raise ValueError('Aucune proposition à approuver ('+j['status']+')')
- racine=Path(j['workspace'])
- fichiers=mc_agent.valider_proposition(racine,json.loads(j['proposal']))
- ecrits=mc_agent.appliquer(racine,fichiers)
- c.execute("UPDATE mc_jobs SET status='approved',finished_at=CURRENT_TIMESTAMP WHERE id=?",(i,))
- journal(c,i,'approuvé et écrit : '+', '.join(e['path'] for e in ecrits)[:300])
- audit(c,p,'job_approved',{'id':i,'fichiers':[e['path'] for e in ecrits]})
- return {'fichiers':ecrits}
-
-def job_refuser(c,p,i,d):
- j=job_publie(c,p,i)
- if j['status'] not in ('proposed','paused'):raise ValueError('On ne refuse pas un travail déjà appliqué ('+j['status']+') : utilisez git ou la restauration')
- motif=str(d.get('reason','Refusé par un humain'))[:500]
- c.execute("UPDATE mc_jobs SET status='cancelled',error=?,finished_at=CURRENT_TIMESTAMP WHERE id=?",(motif,i))
- journal(c,i,'refusé : '+motif[:200])
- audit(c,p,'job_rejected',{'id':i,'raison':motif[:300]})
- return {'ok':True}
-
-def job_annuler(c,p,i):
- j=job_publie(c,p,i)
- if j['status'] in ('approved','completed'):raise ValueError('Job déjà appliqué : on ne l’annule plus')
- _annulations.add(i);_pauses.discard(i)
- c.execute("UPDATE mc_jobs SET status='cancelled',finished_at=CURRENT_TIMESTAMP WHERE id=?",(i,))
- journal(c,i,'annulé par un humain')
- audit(c,p,'job_cancelled',{'id':i})
- return {'ok':True}
-
-def auteur_preuve():
- """Principal authentifié, jamais le nom envoyé par le client."""
- identite=mc_security.current()
- if identite.kind=='agent' and identite.agent:return 'agent:%d'%identite.agent
- return identite.kind
-
-def job_tester(c,p,i,d):
- acteur(c,p,d,'can_run_tests')
- j=job_publie(c,p,i)
- if j['status'] not in ('approved','completed'):
-  raise ValueError('On ne teste pas un travail non appliqué (statut '+j['status']+')')
- if not j['workspace']:raise ValueError('Workspace absent')
- racine=Path(j['workspace'])
- commande=required_text(d,'command',40)
- fichier=d.get('file')
- if commande in ('py_compile','node_check'):
-  fichier=required_text(d,'file',500)
-  cible=mc_agent.chemin_sur(racine,fichier)
-  if not cible.is_file():raise ValueError('Le fichier à vérifier doit exister dans le workspace')
- elif commande=='unittest':
-  tests=list(racine.rglob('test*.py'))+list(racine.rglob('*_test.py'))
-  if not tests:raise ValueError('Aucun fichier de test trouvé dans le workspace')
-  if fichier is not None and mc_agent.chemin_sur(racine,fichier) not in tests:raise ValueError('Le fichier fourni n’est pas un fichier de test du workspace')
- resultat=mc_agent.executer_commande(racine,commande,fichier)
- if commande=='unittest' and resultat['exit_code']==0 and not re.search(r'Ran\s+[1-9]\d*\s+tests?',resultat.get('stdout','')+'\n'+resultat.get('stderr','')):
-  resultat['exit_code']=2
-  resultat['stderr']=(resultat.get('stderr','')+'\nAucun test exécuté : preuve refusée').strip()
- resultat['at']=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
- resultat['job_id']=j['id']
- preuve=json.dumps(resultat,ensure_ascii=False)
- if len(preuve)>MAX_PREUVE:raise ValueError('Preuve trop volumineuse (%d caractères, maximum %d)'%(len(preuve),MAX_PREUVE))
- c.execute('UPDATE mc_jobs SET evidence=? WHERE id=?',(preuve,i))
- statut='completed' if j['status']=='approved' and resultat['exit_code']==0 else j['status']
- if statut!=j['status']:c.execute("UPDATE mc_jobs SET status='completed' WHERE id=?",(i,))
- journal(c,i,'test %s → code %s (%s ms)'%(resultat['command'],resultat['exit_code'],resultat['duration_ms']))
- if j['assignment_id'] and resultat['exit_code']==0:
-  c.execute("UPDATE mc_assignments SET verification='test',verified=1,evidence=?,verified_at=?,verified_by=? WHERE id=?",(preuve,resultat['at'],auteur_preuve(),j['assignment_id']))
- audit(c,p,'job_tested',{'id':i,'command':resultat['command'],'exit_code':resultat['exit_code']})
- return {'evidence':resultat,'status':statut}
-
-# --- P5 : revue, validation, commit, rapport --------------------------------
-def review_creer(c,p,d):
- j=job_publie(c,p,int(d['job_id']))
- if j['status'] not in ('approved','completed'):raise ValueError('On ne révise qu’un travail déjà appliqué')
- kind=required_text(d,'kind',20)
- if kind not in ('code','tests','securite'):raise ValueError('Type de revue inconnu (code, tests, securite)')
- aid=d.get('agent_id');aid=int(aid) if aid not in ('',None) else None
- if aid:agent(c,p,aid)
- if kind=='securite':
-  constats=mc_agent.analyser_diff(j['diff'])
-  verdict='probleme' if constats else 'ok'
- else:
-  verdict=str(d.get('verdict','')).strip()
-  if verdict not in ('ok','probleme'):raise ValueError('Verdict invalide (ok ou probleme)')
-  constats=[str(x)[:500] for x in (d.get('findings') or []) if str(x).strip()][:50]
- cur=c.execute('INSERT INTO mc_reviews(project_id,job_id,agent_id,kind,verdict,findings) VALUES(?,?,?,?,?,?)',(p,j['id'],aid,kind,verdict,json.dumps(constats,ensure_ascii=False)[:8000]))
- journal(c,j['id'],'revue %s : %s (%d constat(s))'%(kind,verdict,len(constats)))
- audit(c,p,'review_recorded',{'id':cur.lastrowid,'job':j['id'],'kind':kind,'verdict':verdict})
- return {'id':cur.lastrowid,'verdict':verdict,'findings':constats}
-
-def job_valider(c,p,d):
- acteur(c,p,d,'can_approve_jobs')
- j=job_publie(c,p,int(d['id']))
- if j['status'] not in ('approved','completed'):raise ValueError('Seul un travail appliqué peut être validé')
- try:preuve=json.loads(j['evidence'] or '{}')
- except ValueError:preuve={}
- if preuve.get('exit_code')!=0:
-  raise ValueError('Aucun test réussi enregistré : lance d’abord « Lancer les tests »')
- # A self-contained green test is not proof of a delivered change.
- # Only a proposed, non-test source file may unlock final validation.
- try:proposition=json.loads(j['proposal'] or '{}')
- except (ValueError,TypeError):proposition={}
- sources=[]
- for fichier in proposition.get('files',[]):
-  if not isinstance(fichier,dict):continue
-  chemin=Path(str(fichier.get('path') or ''))
-  morceaux={part.lower() for part in chemin.parts}
-  nom=chemin.stem.lower()
-  if chemin.suffix.lower() not in ('.py','.js','.mjs','.jsx','.ts','.tsx','.html','.css','.sql'):continue
-  if morceaux.intersection({'test','tests','__tests__'}) or nom.startswith('test_') or nom.endswith('_test'):continue
-  if len(str(fichier.get('content') or '').strip())>=16:sources.append(str(chemin))
- if not sources:
-  raise ValueError('Validation refusée : aucune source développée hors fichiers de tests dans la proposition')
- revues=rows(c,'SELECT kind,verdict,agent_id FROM mc_reviews WHERE job_id=?',(j['id'],))
- mauvaises=[r['kind'] for r in revues if r['verdict']!='ok']
- if mauvaises:raise ValueError('Revue(s) en échec : '+', '.join(mauvaises))
- if not any(r['kind'] in ('code','securite') for r in revues):raise ValueError('Aucune revue de code enregistrée')
- if not any(r['kind']=='tests' and r['agent_id'] is None for r in revues):raise ValueError('Une revue humaine des tests est requise avant validation')
- maintenant=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
- c.execute("UPDATE mc_jobs SET status='completed',finished_at=CURRENT_TIMESTAMP WHERE id=?",(j['id'],))
- journal(c,j['id'],'validé : tests verts et revues favorables')
- if j['assignment_id']:
-  c.execute("UPDATE mc_assignments SET verification='validated',verified=1,evidence=?,verified_at=?,verified_by=? WHERE id=?",(j['evidence'],maintenant,auteur_preuve(),j['assignment_id']))
- audit(c,p,'job_validated',{'id':j['id'],'revues':[r['kind'] for r in revues]})
- return {'ok':True,'verification':'validated'}
-
-def job_commit(c,p,d):
- acteur(c,p,d,'can_approve_jobs')
- j=job_publie(c,p,int(d['id']))
- if j['status'] not in ('approved','completed'):raise ValueError('Seul un travail appliqué peut être commité')
- message=str(d.get('message') or ('DIOPTRE job %d : %s'%(j['id'],j['title'])))[:200]
- resultat=mc_agent.commit_git(Path(j['workspace']),message)
- try:preuve=json.loads(j['evidence'] or '{}')
- except ValueError:preuve={}
- preuve['commit']=resultat.get('commit')
- preuve['commit_message']=resultat.get('message')
- c.execute('UPDATE mc_jobs SET evidence=? WHERE id=?',(json.dumps(preuve,ensure_ascii=False)[:8000],j['id']))
- journal(c,j['id'],'commit '+str(resultat.get('commit')))
- audit(c,p,'job_committed',{'id':j['id'],'commit':resultat.get('commit')})
- return resultat
-
-def rapport_job(c,p,i):
- j=job_publie(c,p,i)
- revues=rows(c,'SELECT kind,verdict,findings,created_at FROM mc_reviews WHERE job_id=? ORDER BY id',(i,))
- try:preuve=json.loads(j['evidence'] or '{}')
- except ValueError:preuve={}
- return {'job':{k:j[k] for k in ('id','title','task','status','model','workspace','created_at','started_at','finished_at')},
-  'proposal':j['proposal'],'diff':j['diff'],'evidence':preuve,'reviews':revues,'log':j['log']}
 # --- P6 : roles personnalises, recrutement, equipes --------------------------
 def roles_projet(c,p):
  perso=rows(c,'SELECT key,label,description FROM mc_roles WHERE project_id=? ORDER BY key',(p,))
@@ -554,6 +267,7 @@ def roles_projet(c,p):
 def role_valide(c,p,role):
  return any(r['key']==role for r in roles_projet(c,p))
 
+@action('admin',payload_arg=0)
 def role_creer(c,p,d):
  cle=required_text(d,'key',40)
  if cle in ROLES:raise ValueError('Ce rôle existe déjà dans la bibliothèque de base')
@@ -575,11 +289,13 @@ def permissions_lire(c,p):
   can_approve_jobs=permission(c,p,e['team'],'can_approve_jobs'),
   can_run_tests=permission(c,p,e['team'],'can_run_tests')) for e in equipes]
 
+@action('admin',payload_arg=0)
 def permissions_definir(c,p,d):
  equipe=required_text(d,'team',80)
  c.execute('INSERT INTO mc_team_permissions(project_id,team,can_create_agents,can_approve_jobs,can_run_tests) VALUES(?,?,?,?,?) ON CONFLICT(project_id,team) DO UPDATE SET can_create_agents=excluded.can_create_agents,can_approve_jobs=excluded.can_approve_jobs,can_run_tests=excluded.can_run_tests',(p,equipe,int(bool(d.get('can_create_agents',True))),int(bool(d.get('can_approve_jobs',True))),int(bool(d.get('can_run_tests',True)))))
  audit(c,p,'team_permissions',{'team':equipe});return {'ok':True}
 
+@action('manage',payload_arg=0)
 def branche_creer(c,p,d):
  nom=required_text(d,'name',80)
  architecte=d.get('architect_id');architecte=int(architecte) if architecte not in ('',None) else None
@@ -587,6 +303,7 @@ def branche_creer(c,p,d):
  cur=c.execute('INSERT INTO mc_branches(project_id,name,architect_id,description) VALUES(?,?,?,?)',(p,nom,architecte,str(d.get('description',''))[:400]))
  audit(c,p,'branch_created',{'id':cur.lastrowid,'name':nom});return {'id':cur.lastrowid}
 
+@action('manage',payload_arg=0)
 def branche_modifier(c,p,d):
  b=one(c,'SELECT * FROM mc_branches WHERE project_id=? AND id=?',(p,int(d['id'])))
  updates={}
@@ -614,12 +331,14 @@ def acteur(c,p,d,action=None):
   raise ValueError('L’équipe '+a['team']+' n’a pas le droit : '+action)
  return a
 
+@action('manage',payload_arg=0)
 def agent_clone(c,p,d):
  source=agent(c,p,int(d['id']))
  nom=str(d.get('name') or (source['name']+' (copie)'))[:100]
  cur=c.execute('INSERT INTO mc_agents(project_id,name,role,team,manager_id,status,model,instructions,x,y) VALUES(?,?,?,?,?,?,?,?,?,?)',(p,nom,source['role'],source['team'],source['manager_id'],'idle',source['model'],source['instructions'],source['x']+60,source['y']+60))
  audit(c,p,'agent_cloned',{'source':source['id'],'id':cur.lastrowid});return {'id':cur.lastrowid,'name':nom}
 
+@action('manage',payload_arg=0)
 def recrue_creer(c,p,d):
  role=required_text(d,'role',40)
  if not role_valide(c,p,role):raise ValueError('Rôle inconnu')
@@ -631,6 +350,7 @@ def recrue_creer(c,p,d):
  audit(c,p,'recruit_requested',{'id':cur.lastrowid,'name':nom,'role':role})
  return {'id':cur.lastrowid,'status':'pending'}
 
+@action('admin',payload_arg=0)
 def recrue_decider(c,p,d):
  recrue=one(c,'SELECT * FROM mc_recruits WHERE project_id=? AND id=?',(p,int(d['id'])))
  if recrue['status']!='pending':raise ValueError('Recrutement déjà tranché ('+recrue['status']+')')
@@ -649,6 +369,7 @@ def recrue_decider(c,p,d):
  audit(c,p,'recruit_rejected',{'id':recrue['id']})
  return {'status':'rejected'}
 
+@action('manage',payload_arg=0)
 def agent_archiver(c,p,d):
  a=agent(c,p,int(d['id']))
  c.execute("UPDATE mc_agents SET status='archived' WHERE id=?",(a['id'],))
@@ -667,6 +388,7 @@ SYSTEME_PLAN=(
 def charge_par_agent(c,p):
  return {r['agent_id']:r['n'] for r in rows(c,"SELECT agent_id,count(*) AS n FROM mc_jobs WHERE project_id=? AND status IN ('queued','running','paused','proposed') GROUP BY agent_id",(p,))}
 
+@action('manage',payload_arg=0)
 def plan_proposer(c,p,d,genere=None):
  genere=genere or (lambda modele,tache,contexte:mc_agent.generer_ollama(modele,SYSTEME_PLAN,tache,contexte))
  objectif=required_text(d,'objective',2000)
@@ -688,6 +410,7 @@ def plan_proposer(c,p,d,genere=None):
  audit(c,p,'plan_proposed',{'id':plan_id,'taches':len(plan['tasks']),'sans_agent':manquants})
  return {'id':plan_id,'plan':plan,'assignations':affectations,'roles_sans_agent':manquants}
 
+@action('manage',payload_arg=0)
 def plan_appliquer(c,p,d):
  plan_id=int(d['id'])
  ligne=one(c,'SELECT * FROM mc_plans WHERE project_id=? AND id=?',(p,plan_id))
@@ -706,6 +429,7 @@ def plan_appliquer(c,p,d):
  audit(c,p,'plan_applied',{'id':plan_id,'jobs':list(ids.values())})
  return {'jobs':ids}
 
+@action('manage',payload_arg=0)
 def orchestrateur_lancer(c,p,d):
  limite=mc_plan.executions_simultanees()
  en_cours=len(rows(c,"SELECT id FROM mc_jobs WHERE project_id=? AND status='running'",(p,)))
@@ -761,7 +485,7 @@ def charge_agents(c,p):
 
 # --- P7 : application, reglages, recherche, sauvegardes ----------------------
 SERVEUR=[None]
-VERSION='2.7.0'
+VERSION='2.8.0'
 MAX_TEXTE=200000
 MAX_PREUVE=8000
 ADMIN_TOKEN=os.environ.get('MC_ADMIN_TOKEN') or secrets.token_urlsafe(24)
@@ -776,6 +500,7 @@ def reglages(c,p):
  for ligne in rows(c,'SELECT key,value FROM mc_settings WHERE project_id=?',(p,)):valeurs[ligne['key']]=ligne['value']
  return valeurs
 
+@action('admin',payload_arg=0)
 def reglage_definir(c,p,d):
  cle=required_text(d,'key',40)
  if cle not in REGLAGES_DEFAUT:raise ValueError('Réglage inconnu : '+cle)
@@ -819,73 +544,19 @@ def historique(c,p,limite=80):
   'jobs':rows(c,'SELECT id,title,status,created_at,finished_at FROM mc_jobs WHERE project_id=? ORDER BY id DESC LIMIT ?',(p,int(limite)))}
 
 def sauvegardes_disponibles():
- base=ROOT/'backups'
- if not base.exists():return []
- return [{'nom':f.name,'octets':f.stat().st_size,'quand':datetime.datetime.fromtimestamp(f.stat().st_mtime).isoformat(timespec='seconds'),
-          'fichiers_importes':f.with_suffix('.imports.zip').is_file()}
-  for f in sorted(base.glob('*.sqlite3'),key=lambda x:x.stat().st_mtime,reverse=True)[:30]]
-
+ return mc_backups.disponibles(ROOT)
+@action('admin',payload_arg=0)
 def restaurer_sauvegarde(c,p,d):
- nom=required_text(d,'file',200)
- base=(ROOT/'backups').resolve()
- source=(base/nom).resolve()
- if source.parent!=base or not source.exists():
-  raise ValueError('Sauvegarde introuvable dans backups/ : '+nom)
- securite=sauvegarder(ROOT/'backups'/('dioptre-avant-restauration-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'.sqlite3'),inclure_imports=False)
- archive=source.with_suffix('.imports.zip')
- # Validate ZIP content and local conflicts before replacing the database.
- fichiers=mc_documents.restore_imports(source,archive)
- origine=sqlite3.connect(source);cible=sqlite3.connect(DB)
- try:origine.backup(cible)
- finally:cible.close();origine.close()
- init()  # Reapply additive migrations when restoring a pre-V2.2 database.
- audit(c,p,'database_restored',{'file':nom,'sauvegarde_prealable':securite.name,'fichiers_restaures':fichiers})
- return {'ok':True,'sauvegarde_prealable':securite.name,'fichiers_restaures':fichiers,
-         'avertissement':None if archive.is_file() else 'Sauvegarde ancienne sans archive de fichiers importés'}
-
+ return mc_backups.restaurer(c,p,d,racine=ROOT,base=DB,audit=audit,init=init)
 def demander_arret():
  threading.Thread(target=lambda: SERVEUR[0] and SERVEUR[0].shutdown(),daemon=True).start()
  return {'ok':True,'arret':'imminent'}
 
 def rotation_sauvegardes(limite=10):
- base=ROOT/'backups'
- candidats=list(base.glob('dioptre-auto-*.sqlite3'))+list(base.glob('bm318d-auto-*.sqlite3'))
- vieux=sorted(candidats,key=lambda x:x.stat().st_mtime,reverse=True)[limite:]
- for fichier in vieux:
-  fichier.unlink(missing_ok=True)
-  fichier.with_suffix('.imports.zip').unlink(missing_ok=True)
- return len(vieux)
-
+ return mc_backups.rotation(ROOT,limite)
 def boucle_sauvegardes(minutes):
- while True:
-  time.sleep(max(60,int(minutes)*60))
-  try:
-   base=ROOT/'backups'
-   sauvegarder(base/('dioptre-auto-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'.sqlite3'))
-   rotation_sauvegardes(10)
-  except Exception:
-   pass
-
-def _dispatch(c,path,d):
- mc_security.authorize_route(c,path,d)
- p=int(d.get('project',0))
- if path not in ('/api/mc/shutdown','/api/mc/backups','/api/mc/security/revoke'):
-  project(c,p)
- if path=='/api/mc/security/token':
-  a=agent(c,p,int(d['agent_id']))
-  if a['status']=='archived':raise ValueError('Agent archivé')
-  return mc_security.issue(p,a['id'],d.get('actions'),int(d.get('ttl',900)))
- if path=='/api/mc/security/revoke':
-  mc_security.revoke(required_text(d,'grant_id',100));return {'revoked':True}
- if path.startswith('/api/mc/connectors/'):
-  return mc_connectors.dispatch(c,p,path.rsplit('/',1)[-1],d)
- if path=='/api/mc/documents/save':return mc_documents.save(c,p,d)
- if path=='/api/mc/documents/delete':return mc_documents.delete(c,p,d)
- if path=='/api/mc/documents/import':
-  result=mc_documents.import_file(c,p,d,reglages(c,p).get('workspace_dir'))
-  audit(c,p,'document_imported',{'id':result['item']['id'],'filename':result['item']['title'],'bytes':result['bytes']})
-  return result
- if path=='/api/mc/agent':
+ return mc_backups.boucle(ROOT,DB,minutes)
+def agent_creer(c,p,d):
   name=required_text(d,'name',100);role=required_text(d,'role',40)
   if not role_valide(c,p,role):raise ValueError('Rôle inconnu')
   team=str(d.get('team','Général')).strip()[:80] or 'Général'
@@ -894,7 +565,8 @@ def _dispatch(c,path,d):
   cur=c.execute('INSERT INTO mc_agents(project_id,name,role,team,manager_id,x,y,instructions,skills) VALUES(?,?,?,?,?,?,?,?,?)',(p,name,role,team,manager,int(d.get('x',120)),int(d.get('y',120)),str(d.get('instructions',''))[:2000],str(d.get('skills',''))[:300]))
   c.execute('INSERT OR IGNORE INTO mc_team_permissions(project_id,team) VALUES(?,?)',(p,team))
   audit(c,p,'agent_created',{'id':cur.lastrowid,'name':name});return {'id':cur.lastrowid}
- if path=='/api/mc/agent/update':
+
+def agent_modifier(c,p,d):
   i=int(d['id']);a=agent(c,p,i)
   updates={}
   for k in ('name','team','instructions','model','skills'):
@@ -923,188 +595,38 @@ def _dispatch(c,path,d):
   if not updates:raise ValueError('Aucun changement')
   c.execute('UPDATE mc_agents SET '+','.join(k+'=?' for k in updates)+' WHERE id=?',(*updates.values(),i))
   audit(c,p,'agent_updated',{'id':i,'changes':updates});return {'id':i}
- if path=='/api/mc/link':
-  a=int(d['source_id']);b=int(d['target_id']);kind=required_text(d,'kind',30)
-  if a==b or kind not in ('communication','dependency'):raise ValueError('Lien invalide')
-  agent(c,p,a);agent(c,p,b)
-  if kind=='dependency':
-   graph={}
-   for r in rows(c,"SELECT source_id,target_id FROM mc_links WHERE project_id=? AND kind='dependency'",(p,)):graph.setdefault(r['source_id'],[]).append(r['target_id'])
-   todo=[b];seen=set()
-   while todo:
-    x=todo.pop()
-    if x==a:raise ValueError('Dépendance circulaire refusée')
-    if x not in seen:seen.add(x);todo+=graph.get(x,[])
-  c.execute('INSERT OR IGNORE INTO mc_links(project_id,source_id,target_id,kind) VALUES(?,?,?,?)',(p,a,b,kind))
-  audit(c,p,'link_created',{'from':a,'to':b,'kind':kind});return {'ok':True}
- if path=='/api/mc/mission':
-  title=required_text(d,'title',160);objective=required_text(d,'objective',5000)
-  cur=c.execute('INSERT INTO mc_missions(project_id,title,objective) VALUES(?,?,?)',(p,title,objective))
-  audit(c,p,'mission_created',{'id':cur.lastrowid});return {'id':cur.lastrowid}
- if path=='/api/mc/assignment':
-  m=one(c,'SELECT * FROM mc_missions WHERE project_id=? AND id=?',(p,int(d['mission_id'])))
-  a=agent(c,p,int(d['agent_id']));task=required_text(d,'task',2000)
-  cur=c.execute('INSERT INTO mc_assignments(mission_id,agent_id,task) VALUES(?,?,?)',(m['id'],a['id'],task))
-  audit(c,p,'assignment_created',{'id':cur.lastrowid,'agent':a['id']});return {'id':cur.lastrowid}
- if path=='/api/mc/assignment/update':
-  a=one(c,'SELECT a.* FROM mc_assignments a JOIN mc_missions m ON a.mission_id=m.id WHERE a.id=? AND m.project_id=?',(int(d['id']),p))
-  status=d.get('status',a['status'])
-  if status not in ('queued','working','blocked','done','reviewed'):raise ValueError('Statut invalide')
-  result=str(d.get('result',a['result']))[:8000]
-  # Trois niveaux distincts, et une preuve obligatoire pour le troisieme :
-  # declared = on affirme ; human = un humain a relu ; test = une commande a
-  # reellement tourne, avec son code de sortie.
-  verification=a['verification']
-  if 'verification' in d:verification=str(d['verification'])
-  elif d.get('verified') is True:verification='human' if status=='reviewed' else a['verification']
-  if verification not in ('none','declared','human','test','approved','validated'):raise ValueError('Niveau de vérification inconnu')
-  if verification in ('validated','approved'):
-   raise ValueError('Validation refusée : seul le serveur peut valider après un test exécuté et des revues')
-  if verification in ('human','test','approved','validated') and status not in ('done','reviewed'):raise ValueError('On ne vérifie pas un travail encore en cours')
-  evidence=a['evidence']
-  if verification=='test':
-   if 'evidence' not in d or not isinstance(d['evidence'],dict):raise ValueError('Preuve invalide')
-   prouve=d['evidence']
-   if not str(prouve.get('command','')).strip() or not isinstance(prouve.get('exit_code'),int):
-    raise ValueError('Preuve de test incomplète : commande et code de sortie (entier) requis')
-   identifiant_job=prouve.get('job_id')
-   if not isinstance(identifiant_job,int):
-    raise ValueError('Preuve refusée : elle doit citer le job (job_id) qui l’a produite')
-   job_source=one(c,'SELECT * FROM mc_jobs WHERE project_id=? AND id=?',(p,identifiant_job))
-   if job_source['status'] not in ('approved','completed'):
-    raise ValueError('Preuve refusée : le job '+str(identifiant_job)+' n’est pas appliqué')
-   if job_source['assignment_id'] not in (None,a['id']):
-    raise ValueError('Preuve refusée : elle appartient à une autre attribution')
-   try:stockee=json.loads(job_source['evidence'] or '{}')
-   except ValueError:stockee={}
-   if stockee.get('command')!=prouve.get('command') or stockee.get('exit_code')!=prouve.get('exit_code') or stockee.get('job_id')!=identifiant_job:
-    raise ValueError('Preuve refusée : commande ou code de sortie différent du test exécuté')
-   if len(job_source['evidence'])>8000:raise ValueError('Preuve exécutée trop volumineuse')
-   evidence=job_source['evidence']
-  elif 'evidence' in d:
-   if not isinstance(d['evidence'],dict):raise ValueError('Preuve invalide')
-   evidence=json.dumps(d['evidence'],ensure_ascii=False)[:8000]
-  verified=1 if verification in ('human','test') else 0
-  verifie_le=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds') if verified else a['verified_at']
-  verifie_par=auteur_preuve() if verified else None
-  c.execute('UPDATE mc_assignments SET status=?,result=?,verified=?,verification=?,evidence=?,verified_at=?,verified_by=? WHERE id=?',(status,result,verified,verification,evidence,verifie_le,verifie_par,a['id']))
-  audit(c,p,'assignment_updated',{'id':a['id'],'status':status,'verification':verification,'verified':verified});return {'ok':True,'verification':verification}
- if path=='/api/mc/note':
-  aid=d.get('agent_id');aid=int(aid) if aid not in ('',None) else None
-  if aid:agent(c,p,aid)
-  scope=d.get('scope','project')
-  if scope not in ('project','team','agent'):raise ValueError('Portée invalide')
-  equipe=str(d.get('team') or '').strip()[:80] or None
-  if scope=='team' and not equipe and aid:equipe=agent(c,p,aid)['team']
-  if scope=='team' and not equipe:raise ValueError('Une note d’équipe demande une équipe')
-  remplasse=d.get('supersedes');remplasse=int(remplasse) if remplasse not in ('',None) else None
-  if remplasse is not None:
-   ancienne=one(c,'SELECT * FROM mc_notes WHERE project_id=? AND id=?',(p,remplasse))
-   if ancienne['scope']!=scope:raise ValueError('On ne remplace pas une note d’une autre portée')
-   if scope=='agent' and ancienne['agent_id']!=aid:raise mc_security.Refus('On ne remplace pas la note privée d’un autre agent')
-   if scope=='team' and ancienne['team']!=equipe:raise mc_security.Refus('On ne remplace pas la note d’une autre équipe')
-  content=required_text(d,'content',4000)
-  cur=c.execute('INSERT INTO mc_notes(project_id,agent_id,scope,team,supersedes,content) VALUES(?,?,?,?,?,?)',(p,aid,scope,equipe,remplasse,content))
-  audit(c,p,'note_created',{'id':cur.lastrowid,'scope':scope,'remplace':remplasse});return {'id':cur.lastrowid}
- if path=='/api/mc/decision':
-  aid=d.get('agent_id');aid=int(aid) if aid not in ('',None) else None
-  if aid:agent(c,p,aid)
-  titre=required_text(d,'title',160);decision=required_text(d,'decision',4000);raison=required_text(d,'rationale',4000)
-  alternative=str(d.get('alternatives',''))[:4000]
-  cur=c.execute('INSERT INTO mc_decisions(project_id,agent_id,title,decision,rationale,alternatives) VALUES(?,?,?,?,?,?)',(p,aid,titre,decision,raison,alternative))
-  audit(c,p,'decision_recorded',{'id':cur.lastrowid,'title':titre});return {'id':cur.lastrowid}
- if path=='/api/mc/message':
-  de=d.get('from_agent');de=int(de) if de not in ('',None) else None
-  vers=d.get('to_agent');vers=int(vers) if vers not in ('',None) else None
-  equipe=str(d.get('to_team') or '').strip()[:80] or None
-  if de:agent(c,p,de)
-  if vers:agent(c,p,vers)
-  if bool(vers)==bool(equipe):raise ValueError('Un message vise un agent ou une équipe, pas les deux ni aucun')
-  corps=required_text(d,'body',4000)
-  cur=c.execute('INSERT INTO mc_messages(project_id,from_agent,to_agent,to_team,body) VALUES(?,?,?,?,?)',(p,de,vers,equipe,corps))
-  audit(c,p,'message_sent',{'id':cur.lastrowid,'vers_agent':vers,'vers_equipe':equipe});return {'id':cur.lastrowid}
- if path=='/api/mc/message/read':
-  j=one(c,'SELECT * FROM mc_messages WHERE project_id=? AND id=?',(p,int(d['id'])))
-  aid=int(d['agent_id']);a=agent(c,p,aid)
-  if not (j['to_agent']==aid or (j['to_team'] and j['to_team']==a['team'])):
-   raise ValueError('Ce message ne te concerne pas')
-  if not j['read_at']:
-   c.execute("UPDATE mc_messages SET read_at=CURRENT_TIMESTAMP WHERE id=?",(j['id'],))
-   audit(c,p,'message_read',{'id':j['id'],'agent':aid})
-  return {'ok':True,'deja_lu':bool(j['read_at'])}
- if path=='/api/mc/handoff/ack':
-  j=one(c,'SELECT * FROM mc_handoffs WHERE project_id=? AND id=?',(p,int(d['id'])))
-  aid=int(d['agent_id']);agent(c,p,aid)
-  if j['new_manager_id']!=aid:raise ValueError('Seul le nouveau responsable peut acquitter cette passation')
-  if j['ack_at']:raise ValueError('Passation déjà acquittée')
-  c.execute("UPDATE mc_handoffs SET ack_at=CURRENT_TIMESTAMP,ack_by=? WHERE id=?",(aid,j['id']))
-  audit(c,p,'handoff_acknowledged',{'id':j['id'],'agent':aid})
-  return {'ok':True}
- if path=='/api/mc/job':return job_creer(c,p,d)
- if path=='/api/mc/job/run':return job_lancer(c,p,int(d['id']))
- if path=='/api/mc/job/pause':return job_pause(c,p,int(d['id']))
- if path=='/api/mc/job/resume':return job_reprendre(c,p,int(d['id']))
- if path=='/api/mc/job/approve':return job_approuver(c,p,int(d['id']),d)
- if path=='/api/mc/job/reject':return job_refuser(c,p,int(d['id']),d)
- if path=='/api/mc/job/cancel':return job_annuler(c,p,int(d['id']))
- if path=='/api/mc/job/test':return job_tester(c,p,int(d['id']),d)
- if path=='/api/mc/review':return review_creer(c,p,d)
- if path=='/api/mc/role':return role_creer(c,p,d)
- if path=='/api/mc/branch':return branche_creer(c,p,d)
- if path=='/api/mc/branch/update':return branche_modifier(c,p,d)
- if path=='/api/mc/agent/clone':return agent_clone(c,p,d)
- if path=='/api/mc/agent/archive':return agent_archiver(c,p,d)
- if path=='/api/mc/recruit':return recrue_creer(c,p,d)
- if path=='/api/mc/recruit/decide':return recrue_decider(c,p,d)
- if path=='/api/mc/permissions':return permissions_definir(c,p,d)
- if path=='/api/mc/settings':return reglage_definir(c,p,d)
- if path=='/api/mc/backup':return {'file':sauvegarder().name}
- if path=='/api/mc/restore':return restaurer_sauvegarde(c,p,d)
- if path=='/api/mc/shutdown':return demander_arret()
- if path=='/api/mc/job/validate':return job_valider(c,p,d)
- if path=='/api/mc/job/commit':return job_commit(c,p,d)
- if path=='/api/mc/plan':return plan_proposer(c,p,d)
- if path=='/api/mc/plan/apply':return plan_appliquer(c,p,d)
- if path=='/api/mc/orchestrator/run':return orchestrateur_lancer(c,p,d)
- if path=='/api/mc/charge':return charge_agents(c,p)
- raise ValueError('Action inconnue')
+
+mc_jobs.lier(sys.modules[__name__])
+job_publie,job_creer,job_lancer,job_pause,job_reprendre,job_en_arriere,job_executer=mc_jobs.job_publie,mc_jobs.job_creer,mc_jobs.job_lancer,mc_jobs.job_pause,mc_jobs.job_reprendre,mc_jobs.job_en_arriere,mc_jobs.job_executer
+job_approuver,job_refuser,job_annuler,auteur_preuve,job_tester,review_creer,job_valider,job_commit,rapport_job=mc_jobs.job_approuver,mc_jobs.job_refuser,mc_jobs.job_annuler,mc_jobs.auteur_preuve,mc_jobs.job_tester,mc_jobs.review_creer,mc_jobs.job_valider,mc_jobs.job_commit,mc_jobs.rapport_job
+ROUTES=mc_routes.construire(sys.modules[__name__])
+
+
+def _dispatch(c,path,d):
+ mc_security.authorize_route(c,path,d)
+ p=int(d.get('project',0))
+ if path not in mc_routes.SANS_PROJET:
+  project(c,p)
+ if path.startswith('/api/mc/connectors/'):
+  return mc_connectors.dispatch(c,p,path.rsplit('/',1)[-1],d)
+ fonction=ROUTES.get(path)
+ if fonction is None:raise ValueError('Action inconnue')
+ return fonction(c,p,d)
+
+
 def dispatch(c,path,d,principal=None):
  identity=principal if principal is not None else mc_security.current()
  with mc_security.use(identity):
   mc_security.authorize_route(c,path,d)
   return _dispatch(c,path,d)
 
-def _guard_function(function,action,job_arg=False,payload_arg=None):
- signature=inspect.signature(function)
- names=list(signature.parameters)[2:]
- @functools.wraps(function)
- def guarded(c,p,*args,**kwargs):
-  bound=signature.bind(c,p,*args,**kwargs);bound.apply_defaults()
-  data=bound.arguments.get(names[payload_arg],{}) if payload_arg is not None else {}
-  data=data or {}
-  job=bound.arguments.get(names[0]) if job_arg else None
-  if action in ('validate','commit','review'):job=data.get('job_id') or data.get('id')
-  mc_security.require(c,p,action,data,job)
-  return function(c,p,*args,**kwargs)
- return guarded
-
-# Direct Python calls are privileged broker entry points too, not bypasses.
-for _name,_action,_job,_payload in (
- ('job_creer','job_create',False,0),('job_lancer','job_run',True,None),
- ('job_pause','job_control',True,None),('job_reprendre','job_control',True,None),
- ('job_annuler','job_control',True,None),('job_refuser','approve',True,1),
- ('job_approuver','approve',True,1),('job_tester','test',True,1),
- ('job_valider','validate',False,0),('job_commit','commit',False,0),
- ('review_creer','review',False,0),('permissions_definir','admin',False,0),
- ('reglage_definir','admin',False,0),('restaurer_sauvegarde','admin',False,0),
- ('role_creer','admin',False,0),('recrue_decider','admin',False,0),
- ('agent_clone','manage',False,0),('agent_archiver','manage',False,0),
- ('branche_creer','manage',False,0),('branche_modifier','manage',False,0),
- ('plan_proposer','manage',False,0),('plan_appliquer','manage',False,0),
- ('orchestrateur_lancer','manage',False,0),('recrue_creer','manage',False,0)):
- globals()[_name]=_guard_function(globals()[_name],_action,_job,_payload)
-
-class Handler(legacy.Handler):
+class Handler(http.server.BaseHTTPRequestHandler):
+ def log_message(self,*a):pass
+ def reply(self,data,code=200):
+  b=json.dumps(data,ensure_ascii=False).encode()
+  self.send_response(code);self.send_header('Content-Type','application/json; charset=utf-8')
+  self.send_header('Content-Length',str(len(b)));self.send_header('Cache-Control','no-store')
+  self.end_headers();self.wfile.write(b)
  # --- securite commune a toutes les routes ---
  def _hote_ok(self):
   return (self.headers.get('Host') or '').strip() in ('127.0.0.1:%d'%PORT,'localhost:%d'%PORT)
@@ -1262,10 +784,13 @@ class Handler(legacy.Handler):
      with connect() as c:self.reply(job_publie(c,p,i))
     except (ValueError,KeyError) as e:self.reply({'error':str(e)},400)
     return
-   super().do_GET();return
-  super().do_GET()
+   if self.path=='/api/state':
+    with connect() as c:self.reply(mc_legacy.etat(c))
+    return
+   self._refus(404,'Route inconnue');return
+  self._refus(404,'Route inconnue')
  def do_POST(self):
-  if not (self.path.startswith('/api/') or self.path=='/event'):return super().do_POST()
+  if not (self.path.startswith('/api/') or self.path=='/event'):return self._refus(404,'Route inconnue')
   # Le corps est lu avant tout refus : sinon la fermeture de la connexion avec
   # des octets non lus fait perdre la reponse au client (RST sous Windows).
   try:n=int(self.headers.get('Content-Length','0'))
@@ -1284,10 +809,20 @@ class Handler(legacy.Handler):
   if not self.path.startswith('/api/mc/'):
    # Anciennes routes (/api/task, /api/event...) : le corps a deja ete lu, on le
    # remet a disposition du gestionnaire historique.
-   import io
    if self.principal.kind=='agent':return self._refus(403,'Route historique non autorisée aux agents')
-   self.rfile=io.BytesIO(corps)
-   return super().do_POST()
+   fonction=mc_legacy.ROUTES_POST.get(self.path)
+   if fonction is None:return self._refus(404,'Route inconnue')
+   try:
+    if not corps:raise ValueError('Corps vide')
+    d=json.loads(corps)
+    if not isinstance(d,dict):raise ValueError('Corps JSON invalide')
+    if self.path=='/api/ollama':
+     with connect() as c:result=fonction(c,d)
+     self.reply(result);return
+    with LOCK,connect() as c:result=fonction(c,d)
+    self.reply({'ok':True,**result},201);return
+   except PermissionError as e:self.reply({'error':str(e)},403);return
+   except (ValueError,KeyError,TypeError,sqlite3.Error) as e:self.reply({'error':str(e)},400);return
   try:
    if not corps:raise ValueError('Corps vide')
    d=json.loads(corps)

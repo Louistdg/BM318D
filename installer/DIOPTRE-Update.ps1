@@ -13,8 +13,7 @@ $horodatage = Get-Date -Format 'yyyyMMdd-HHmmss'
 $sauvegarde = Join-Path $TargetDir "backups\pre-maj-$horodatage"
 New-Item -ItemType Directory -Force -Path $sauvegarde | Out-Null
 
-$fichiers = @('MissionControl.py','mc_agent.py','mc_plan.py','mc_sandbox.py','mc_sandbox_wsl.py','mc_sandbox_linux.py','mc_security.py','mc_connectors.py','mc_credentials.py','DIOPTRE-WebServer.py',
-              'DIOPTRE.html','mission.js','mission.css','connectors.js','security-ui.js','requirements-v22.txt','V2.2-IMPLEMENTATION.md','V2.3-SECURITE.md',
+$fichiers = @('MissionControl.py','mc_agent.py','mc_plan.py','mc_sandbox.py','mc_sandbox_wsl.py','mc_sandbox_linux.py','mc_security.py','mc_connectors.py','mc_credentials.py','mc_actions.py','mc_backups.py','mc_jobs.py','mc_legacy.py','mc_missions.py','mc_routes.py','mc_documents.py','mc_demo.py','DIOPTRE.html','mission.js','mission.css','connectors.js','security-ui.js','requirements-v22.txt','V2.2-IMPLEMENTATION.md','V2.3-SECURITE.md',
               'DIOPTRE-Controleur.pyw','DIOPTRE-Stop.py','DIOPTRE-Fenetre.pyw')
 $copies = 0
 foreach ($nom in $fichiers) {
