@@ -10,7 +10,7 @@ from pathlib import Path
 
 import MissionControl as mc
 
-dossier = Path(tempfile.mkdtemp(prefix='bm318d-projets-'))
+dossier = Path(tempfile.mkdtemp(prefix='dioptre-projets-'))
 mc.DB = dossier / 'projets.sqlite3'
 mc.ROOT = dossier
 with sqlite3.connect(mc.DB) as c:

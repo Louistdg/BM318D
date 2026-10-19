@@ -78,7 +78,7 @@ class CDP {
   }
 }
 
-const dossier = fs.mkdtempSync(path.join(os.tmpdir(), 'bm318d-chat-'));
+const dossier = fs.mkdtempSync(path.join(os.tmpdir(), 'dioptre-chat-'));
 const base = path.join(dossier, 'chat.sqlite3');
 const prep = spawnSync('python', ['-c', `
 import sqlite3, sys

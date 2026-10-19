@@ -1,6 +1,6 @@
 # DIOPTRE
 
-**Version 2.5.4 — 19/10/2026.** Ancien nom de code : **BM318D**, encore présent dans certains noms de fichiers de l'application (par exemple `LANCER-BM318d.cmd`).
+**Version 2.5.4 — 19/10/2026.** Ancien nom de code : **DIOPTRE**, encore présent dans certains noms de fichiers de l'application (par exemple `LANCER-DIOPTRE.cmd`).
 Ce depot contient la source complete de l'application Windows : service Python
 local, interface Mission Control, connecteurs IA, bac a sable, tests.
 
@@ -66,7 +66,7 @@ not a dependency: discovery fails closed instead of opening by accident.
 ## Quick start
 
 ```cmd
-set MC_DB=%TEMP%\bm318d.sqlite3
+set MC_DB=%TEMP%\dioptre.sqlite3
 C:\Python314\python.exe MissionControl.py
 ```
 

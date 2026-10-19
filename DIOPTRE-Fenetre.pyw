@@ -1,4 +1,4 @@
-"""BM318d — petite fenêtre de contrôle, sans terminal.
+"""DIOPTRE — petite fenêtre de contrôle, sans terminal.
 
 Elle ne remplace pas la page web : elle sert à voir si le service tourne, à
 l'ouvrir, à le sauvegarder et à l'arrêter proprement. L'arrêt et la sauvegarde
@@ -124,7 +124,7 @@ class Fenetre:
         import tkinter as tk
         self.racine = racine
         self.age = 0
-        racine.title('BM318d Control Center')
+        racine.title('DIOPTRE Control Center')
         racine.geometry('360x190')
         racine.resizable(False, False)
         self.statut = tk.Label(racine, text='...', font=('Segoe UI', 11))

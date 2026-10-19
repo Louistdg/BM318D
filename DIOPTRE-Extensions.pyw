@@ -3,7 +3,7 @@ from tkinter import ttk, messagebox
 import sqlite3, threading, json, urllib.request, urllib.error, html, webbrowser
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent
-DB=ROOT/'bm318d.sqlite3'
+DB=ROOT/'dioptre.sqlite3'
 MODEL=os.environ.get('MC_OLLAMA_MODEL') or 'qwen2.5:3b'
 def db(sql,args=(),write=False):
     with sqlite3.connect(DB,timeout=15) as c:
@@ -11,14 +11,14 @@ def db(sql,args=(),write=False):
         cur=c.execute(sql,args)
         return cur.lastrowid if write else cur.fetchall()
 db('CREATE TABLE IF NOT EXISTS task_dependencies(task_id INTEGER NOT NULL, depends_on INTEGER NOT NULL, PRIMARY KEY(task_id,depends_on))',write=True)
-root=tk.Tk();root.title('BM318d — Agent Ollama & Canvas');root.geometry('1000x720');root.configure(bg='#14111e')
+root=tk.Tk();root.title('DIOPTRE — Agent Ollama & Canvas');root.geometry('1000x720');root.configure(bg='#14111e')
 style=ttk.Style();style.theme_use('clam')
 style.configure('TFrame',background='#14111e')
 style.configure('TLabel',background='#14111e',foreground='#f0eaf8',font=('Segoe UI',10))
 style.configure('TButton',background='#41304e',foreground='#fff',padding=8)
 style.configure('TCombobox',fieldbackground='#292234',foreground='#fff')
 panel=ttk.Frame(root,padding=18);panel.pack(fill='both',expand=True)
-ttk.Label(panel,text='◆ BM318d / AGENT & CANVAS',font=('Segoe UI',18,'bold')).pack(anchor='w')
+ttk.Label(panel,text='◆ DIOPTRE / AGENT & CANVAS',font=('Segoe UI',18,'bold')).pack(anchor='w')
 ttk.Label(panel,text='Agent réel Ollama local • Réponses journalisées • Dépendances entre tâches').pack(anchor='w',pady=8)
 proj=tk.StringVar();task=tk.StringVar();dep=tk.StringVar();state=tk.StringVar(value='Prêt')
 top=ttk.Frame(panel);top.pack(fill='x',pady=8)
@@ -104,7 +104,7 @@ def refresh_canvas():
     p=id_of(proj.get())
     rows=db('SELECT id,title,status FROM tasks WHERE project_id=? ORDER BY id',(p,)) if p else []
     if not rows:
-        canvas.create_text(25,30,anchor='nw',fill='#ddd',text='Ajoute des tâches dans BM318d pour voir le canvas.')
+        canvas.create_text(25,30,anchor='nw',fill='#ddd',text='Ajoute des tâches dans DIOPTRE pour voir le canvas.')
         return
     width=max(canvas.winfo_width(),600)
     pos={}

@@ -1,4 +1,4 @@
-﻿# BM318D — Livraison V2.5.1 : consolidation A1–A4 et vérification B1
+﻿# DIOPTRE — Livraison V2.5.1 : consolidation A1–A4 et vérification B1
 
 **Date du rapport :** 18 octobre 2026
 
@@ -15,10 +15,10 @@
 | Priorité | Résultat vérifié | Fichiers principaux | Commits |
 | --- | --- | --- | --- |
 | **A1 — Sauvegardes des imports** | Chaque sauvegarde SQLite normale produit une archive associée `.imports.zip` pour les fichiers importés. La restauration récupère les fichiers absents et refuse d'écraser un fichier local différent. La rotation supprime aussi les archives associées aux sauvegardes automatiques expirées. | `MissionControl.py`, `mc_documents.py`, `test_documents.py`, `test_app.py`, `README.md` | `efe2217`, `4c86129` |
-| **A2 — Nettoyage Windows** | Fermeture explicite des connexions SQLite du serveur historique et de la sauvegarde ; le test Mission Control se termine sans l'erreur de nettoyage Windows précédemment reproduite. | `BM318d-WebServer.py`, `MissionControl.py`, `test_support_v23.py` | `ad720c6` |
+| **A2 — Nettoyage Windows** | Fermeture explicite des connexions SQLite du serveur historique et de la sauvegarde ; le test Mission Control se termine sans l'erreur de nettoyage Windows précédemment reproduite. | `DIOPTRE-WebServer.py`, `MissionControl.py`, `test_support_v23.py` | `ad720c6` |
 | **A3 — Preuves de tests** | Reproduction d'un `unittest` factice avec `assert True`, puis refus de validation quand la proposition ne contient aucune source livrée hors fichiers de tests. La revue humaine des tests reste obligatoire. | `MissionControl.py`, `test_review.py`, `test_ui.mjs` | `24325be`, `134122d` |
-| **A4 — Prompt du chat** | Les deux serveurs acceptent un corps JSON jusqu'à 2 Mio sur `/api/ollama` ; le test HTTP prouve le transport de 120 000 caractères Unicode et le refus explicite de 120 001 caractères. | `BM318d-WebServer.py`, `MissionControl.py`, `test_http.py` | `cf816f2` |
-| **B1 — Installateur** | Vérification du manifeste `2.5.1`, des fichiers indispensables copiés et du démarrage sur base temporaire. Les correctifs de manifeste existaient déjà sur la branche V2.5.1 de départ : **pas de nouveau commit B1**. | `installer/BM318d-Setup.ps1`, `installer/version.json`, `test_app.py`, `test_clean_install.py` | Déjà présent dans `c7f6bec` |
+| **A4 — Prompt du chat** | Les deux serveurs acceptent un corps JSON jusqu'à 2 Mio sur `/api/ollama` ; le test HTTP prouve le transport de 120 000 caractères Unicode et le refus explicite de 120 001 caractères. | `DIOPTRE-WebServer.py`, `MissionControl.py`, `test_http.py` | `cf816f2` |
+| **B1 — Installateur** | Vérification du manifeste `2.5.1`, des fichiers indispensables copiés et du démarrage sur base temporaire. Les correctifs de manifeste existaient déjà sur la branche V2.5.1 de départ : **pas de nouveau commit B1**. | `installer/DIOPTRE-Setup.ps1`, `installer/version.json`, `test_app.py`, `test_clean_install.py` | Déjà présent dans `c7f6bec` |
 
 ### Historique préalable conservé
 

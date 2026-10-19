@@ -1,4 +1,4 @@
-"""BM318d Mission Control: isolated, additive service on 127.0.0.1:31880."""
+"""DIOPTRE Mission Control: isolated, additive service on 127.0.0.1:31880."""
 import http.server,importlib.util,json,sqlite3,shutil,datetime,threading,os,secrets,time,re
 from pathlib import Path
 import mc_agent
@@ -8,11 +8,24 @@ import mc_security
 import mc_documents
 import contextvars,functools,inspect
 ROOT=Path(__file__).resolve().parent
-spec=importlib.util.spec_from_file_location('legacy',ROOT/'BM318d-WebServer.py')
+spec=importlib.util.spec_from_file_location('legacy',ROOT/'DIOPTRE-WebServer.py')
 legacy=importlib.util.module_from_spec(spec);spec.loader.exec_module(legacy)
 # Base et port surchargeables : les tests d'integration tournent sur une copie
 # temporaire, jamais sur la base de travail.
-DB=Path(os.environ.get('MC_DB') or ROOT/'bm318d.sqlite3')
+
+def _base_par_defaut():
+    """Base par defaut, avec reprise de l'ancien nom (bm318d.sqlite3)."""
+    ancienne = ROOT / 'bm318d.sqlite3'
+    nouvelle = ROOT / 'dioptre.sqlite3'
+    if not nouvelle.exists() and ancienne.exists():
+        try:
+            ancienne.rename(nouvelle)
+        except OSError:
+            return ancienne
+    return nouvelle
+
+
+DB=Path(os.environ.get('MC_DB') or _base_par_defaut())
 HOST='127.0.0.1'
 PORT=int(os.environ.get('MC_PORT') or 31880)
 # Jeton de session : genere a chaque demarrage, injecte dans la page, exige sur
@@ -180,7 +193,7 @@ def init():
 def sauvegarder(destination=None, *, inclure_imports=True):
  # Copie en ligne (API backup de SQLite) : coherente meme si le serveur ecrit.
  if not DB.is_file():return None
- destination=Path(destination) if destination else ROOT/'backups'/('bm318d-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.sqlite3')
+ destination=Path(destination) if destination else ROOT/'backups'/('dioptre-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.sqlite3')
  destination.parent.mkdir(parents=True,exist_ok=True)
  source=sqlite3.connect(DB,timeout=20)
  try:
@@ -514,7 +527,7 @@ def job_commit(c,p,d):
  acteur(c,p,d,'can_approve_jobs')
  j=job_publie(c,p,int(d['id']))
  if j['status'] not in ('approved','completed'):raise ValueError('Seul un travail appliqué peut être commité')
- message=str(d.get('message') or ('BM318d job %d : %s'%(j['id'],j['title'])))[:200]
+ message=str(d.get('message') or ('DIOPTRE job %d : %s'%(j['id'],j['title'])))[:200]
  resultat=mc_agent.commit_git(Path(j['workspace']),message)
  try:preuve=json.loads(j['evidence'] or '{}')
  except ValueError:preuve={}
@@ -748,7 +761,7 @@ def charge_agents(c,p):
 
 # --- P7 : application, reglages, recherche, sauvegardes ----------------------
 SERVEUR=[None]
-VERSION='2.5.4'
+VERSION='2.6.0'
 MAX_TEXTE=200000
 MAX_PREUVE=8000
 ADMIN_TOKEN=os.environ.get('MC_ADMIN_TOKEN') or secrets.token_urlsafe(24)
@@ -818,7 +831,7 @@ def restaurer_sauvegarde(c,p,d):
  source=(base/nom).resolve()
  if source.parent!=base or not source.exists():
   raise ValueError('Sauvegarde introuvable dans backups/ : '+nom)
- securite=sauvegarder(ROOT/'backups'/('bm318d-avant-restauration-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'.sqlite3'),inclure_imports=False)
+ securite=sauvegarder(ROOT/'backups'/('dioptre-avant-restauration-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'.sqlite3'),inclure_imports=False)
  archive=source.with_suffix('.imports.zip')
  # Validate ZIP content and local conflicts before replacing the database.
  fichiers=mc_documents.restore_imports(source,archive)
@@ -836,7 +849,7 @@ def demander_arret():
 
 def rotation_sauvegardes(limite=10):
  base=ROOT/'backups'
- vieux=sorted(base.glob('bm318d-auto-*.sqlite3'),key=lambda x:x.stat().st_mtime,reverse=True)[limite:]
+ vieux=sorted(base.glob('dioptre-auto-*.sqlite3'),key=lambda x:x.stat().st_mtime,reverse=True)[limite:]
  for fichier in vieux:
   fichier.unlink(missing_ok=True)
   fichier.with_suffix('.imports.zip').unlink(missing_ok=True)
@@ -847,7 +860,7 @@ def boucle_sauvegardes(minutes):
   time.sleep(max(60,int(minutes)*60))
   try:
    base=ROOT/'backups'
-   sauvegarder(base/('bm318d-auto-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'.sqlite3'))
+   sauvegarder(base/('dioptre-auto-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'.sqlite3'))
    rotation_sauvegardes(10)
   except Exception:
    pass
@@ -1143,7 +1156,7 @@ class Handler(legacy.Handler):
  def do_GET(self):
   if not self._hote_ok():return self._refus(421,'Hôte non autorisé')
   if self.path=='/':
-   html=(ROOT/'BM318d-Railway.html').read_text(encoding='utf-8')
+   html=(ROOT/'DIOPTRE.html').read_text(encoding='utf-8')
    html=html.replace('</head>','<meta name="mc-token" content="'+TOKEN+'"><link rel="stylesheet" href="/mission.css"><link rel="stylesheet" href="/workspace.css"></head>')
    html=html.replace('</body>','<script src="/mission.js"></script><script src="/security-ui.js"></script><script src="/connectors.js"></script><script src="/workspace.js"></script></body>')
    b=html.encode()
@@ -1308,5 +1321,5 @@ if __name__=='__main__':
  except OSError:pass
  SERVEUR[0]=http.server.ThreadingHTTPServer((HOST,PORT),Handler)
  adresse='http://%s:%d/'%(HOST,PORT)
- print('BM318d Mission Control '+adresse+' (jeton de session actif)',flush=True)
+ print('DIOPTRE Mission Control '+adresse+' (jeton de session actif)',flush=True)
  SERVEUR[0].serve_forever()

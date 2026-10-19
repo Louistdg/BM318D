@@ -1,7 +1,7 @@
 """Verified identity tests through HTTP and direct broker calls, isolated DB."""
 import contextlib,json,os,tempfile,threading,time,unittest,urllib.request,urllib.error
 from pathlib import Path
-_temp=tempfile.TemporaryDirectory(prefix='bm318d-auth-')
+_temp=tempfile.TemporaryDirectory(prefix='dioptre-auth-')
 os.environ['MC_DB']=str(Path(_temp.name)/'auth.sqlite3')
 import MissionControl as mc
 import mc_security as security

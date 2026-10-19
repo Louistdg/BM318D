@@ -10,7 +10,7 @@ import unittest
 import urllib.error
 import urllib.request
 
-_temp = tempfile.TemporaryDirectory(prefix='bm318d-documents-')
+_temp = tempfile.TemporaryDirectory(prefix='dioptre-documents-')
 os.environ['MC_DB'] = str(Path(_temp.name) / 'documents.sqlite3')
 import MissionControl as mc
 import mc_security as security
@@ -307,7 +307,7 @@ class Documents(unittest.TestCase):
 
     def test_model_names_are_escaped_in_the_page(self):
         """Audit 2.5.3, constat faible 1 : les noms de modeles passent par escapeHtml."""
-        page = (Path(__file__).parent / 'BM318d-Railway.html').read_text(encoding='utf-8')
+        page = (Path(__file__).parent / 'DIOPTRE.html').read_text(encoding='utf-8')
         self.assertIn('escapeHtml(m)', page)
         self.assertNotIn("'<option value=\"'+m+'\">'+m+'</option>'", page)
 

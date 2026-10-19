@@ -38,7 +38,7 @@ def ok(nom, condition, detail=''):
         print('  ECHEC ' + nom + (('  -> ' + str(detail)[:300]) if detail != '' else ''))
 
 
-dossier = Path(tempfile.mkdtemp(prefix='bm318d-app-'))
+dossier = Path(tempfile.mkdtemp(prefix='dioptre-app-'))
 mc.DB = dossier / 'app.sqlite3'
 mc_agent.WORKSPACES = dossier / 'workspaces'
 mc.ROOT = dossier  # backups/ et workspaces/ restent dans le dossier temporaire
@@ -108,12 +108,12 @@ with mc.connect() as c:
     liste = mc.sauvegardes_disponibles()
 ok('la liste des sauvegardes est lisible', any(b['nom'] == manuelle['file'] for b in liste), liste[:3])
 for i in range(12):
-    (dossier / 'backups' / ('bm318d-auto-%02d.sqlite3' % i)).write_bytes(b'x')
-    (dossier / 'backups' / ('bm318d-auto-%02d.imports.zip' % i)).write_bytes(b'zip-test')
+    (dossier / 'backups' / ('dioptre-auto-%02d.sqlite3' % i)).write_bytes(b'x')
+    (dossier / 'backups' / ('dioptre-auto-%02d.imports.zip' % i)).write_bytes(b'zip-test')
 supprimes = mc.rotation_sauvegardes(10)
-restants = len(list((dossier / 'backups').glob('bm318d-auto-*.sqlite3')))
+restants = len(list((dossier / 'backups').glob('dioptre-auto-*.sqlite3')))
 ok('la rotation ne garde que 10 sauvegardes automatiques', restants == 10 and supprimes == 2, {'restants': restants, 'supprimes': supprimes})
-archives = len(list((dossier / 'backups').glob('bm318d-auto-*.imports.zip')))
+archives = len(list((dossier / 'backups').glob('dioptre-auto-*.imports.zip')))
 ok('la rotation garde les archives ZIP associées', archives == 10, archives)
 
 print('\n=== restauration ===')
@@ -140,14 +140,14 @@ except ValueError:
 
 print('\n=== installateur ===')
 cible = dossier / 'installation'
-script = RACINE / 'installer' / 'BM318d-Setup.ps1'
+script = RACINE / 'installer' / 'DIOPTRE-Setup.ps1'
 resultat = subprocess.run(['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(script),
                            '-TargetDir', str(cible), '-NoShortcuts'],
                           capture_output=True, text=True, timeout=120)
 ok('l\'installateur s\'exécute', resultat.returncode == 0, resultat.stderr[-300:])
 ok('les fichiers du serveur sont installés', (cible / 'MissionControl.py').exists() and (cible / 'mc_agent.py').exists())
-ok('le lanceur est créé', (cible / 'LANCER-BM318d.cmd').exists())
-ok('l\'arrêt est créé', (cible / 'ARRETER-BM318d.cmd').exists())
+ok('le lanceur est créé', (cible / 'LANCER-DIOPTRE.cmd').exists())
+ok('l\'arrêt est créé', (cible / 'ARRETER-DIOPTRE.cmd').exists())
 ok('le désinstalleur est créé', (cible / 'desinstaller.ps1').exists())
 ok('le dossier de sauvegardes est créé', (cible / 'backups').is_dir())
 
@@ -195,7 +195,7 @@ try:
 
     # Fenêtre de contrôle : mêmes appels, sans ouvrir de fenêtre.
     os.environ['MC_PORT'] = str(port)
-    spec_f = importlib.util.spec_from_file_location('fenetre', RACINE / 'BM318d-Fenetre.pyw')
+    spec_f = importlib.util.spec_from_file_location('fenetre', RACINE / 'DIOPTRE-Fenetre.pyw')
     fenetre = importlib.util.module_from_spec(spec_f)
     spec_f.loader.exec_module(fenetre)
     ok('la fenêtre de contrôle voit le service en ligne', fenetre.en_ligne() is True)
@@ -249,7 +249,7 @@ cible_maj = dossier / 'maj-cible'
 (source_maj / 'MissionControl.py').write_text('VERSION_NOUVELLE = True\n', encoding='utf-8')
 (source_maj / 'version.json').write_text('{"version":"2.1.0"}', encoding='utf-8')
 (cible_maj / 'MissionControl.py').write_text('VERSION_ANCIENNE = True\n', encoding='utf-8')
-script_maj = RACINE / 'installer' / 'BM318d-Update.ps1'
+script_maj = RACINE / 'installer' / 'DIOPTRE-Update.ps1'
 resultat_maj = subprocess.run(['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(script_maj),
                                '-Source', str(source_maj), '-TargetDir', str(cible_maj)],
                               capture_output=True, text=True, timeout=120)
@@ -260,7 +260,7 @@ sauvegardes_maj = list((cible_maj / 'backups').glob('pre-maj-*'))
 ok('une sauvegarde pré-mise-à-jour est créée', len(sauvegardes_maj) == 1 and (sauvegardes_maj[0] / 'MissionControl.py').exists(), sauvegardes_maj)
 
 print('\n=== contrôleur ===')
-spec = importlib.util.spec_from_file_location('controleur', RACINE / 'BM318d-Controleur.pyw')
+spec = importlib.util.spec_from_file_location('controleur', RACINE / 'DIOPTRE-Controleur.pyw')
 controleur = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(controleur)
 ok('le contrôleur sait tester la présence du serveur', callable(controleur.repond))

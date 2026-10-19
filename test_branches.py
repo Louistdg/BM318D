@@ -27,7 +27,7 @@ def ok(nom, condition, detail=''):
         print('  ECHEC ' + nom + (('  -> ' + str(detail)[:300]) if detail != '' else ''))
 
 
-dossier = Path(tempfile.mkdtemp(prefix='bm318d-branches-'))
+dossier = Path(tempfile.mkdtemp(prefix='dioptre-branches-'))
 mc.DB = dossier / 'branches.sqlite3'
 mc_agent.WORKSPACES = dossier / 'workspaces'
 with mc.connect() as c:

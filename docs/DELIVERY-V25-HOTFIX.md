@@ -1,4 +1,4 @@
-# BM318d V2.5.1 — correctifs issus de l’audit
+# DIOPTRE V2.5.1 — correctifs issus de l’audit
 
 ## Changements livrés dans cette branche
 

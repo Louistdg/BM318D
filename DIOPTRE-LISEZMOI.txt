@@ -1,6 +1,6 @@
-BM318d Control Center — V2.5.1
+DIOPTRE Control Center — V2.5.1
 
-Lancement : double-cliquer sur LANCER-BM318d-RAILWAY.cmd
+Lancement : double-cliquer sur LANCER-DIOPTRE-RAILWAY.cmd
 Adresse locale : http://127.0.0.1:31880/
 
 Le canevas des tâches est l’écran d’accueil; Mission Control et ses agents restent accessibles dans la navigation. La vue d’ensemble affiche les tâches et les agents enregistrés, sans agents fictifs.
@@ -43,9 +43,9 @@ Le canevas des tâches est l’écran d’accueil; Mission Control et ses agents
     proposees. Des permissions par equipe existent (creer un agent, approuver un job,
     lancer les tests) et sont verifiees cote serveur quand un agent est designe.
 16. Application (P7) :
-    - lancement sans console : BM318d-Controleur.pyw demarre le serveur si besoin,
+    - lancement sans console : DIOPTRE-Controleur.pyw demarre le serveur si besoin,
       attend qu'il reponde, ouvre le navigateur ; un second lancement n'en cree pas un autre.
-    - arrêt propre : ARRETER-BM318d.cmd (ou python BM318d-Stop.py) demande une confirmation administrateur.
+    - arrêt propre : ARRETER-DIOPTRE.cmd (ou python DIOPTRE-Stop.py) demande une confirmation administrateur.
       Limite connue : le jeton est conservé en clair dans logs/admin-token.txt; protéger ce dossier.
     - « Reglages » : adresse Ollama, modele par defaut, jobs simultanes, intervalle de
       sauvegarde automatique (0 = arretee), dossier des workspaces (lecture seule).
@@ -54,12 +54,12 @@ Le canevas des tâches est l’écran d’accueil; Mission Control et ses agents
     - « Rechercher » dans la barre : agents, missions, jobs, notes, decisions, messages.
     - Le bouton ● compte les messages non lus, recrutements en attente, jobs en echec
       et passations a acquitter.
-    - installer\BM318d-Setup.ps1 installe dans %LOCALAPPDATA%\BM318d avec raccourci
+    - installer\DIOPTRE-Setup.ps1 installe dans %LOCALAPPDATA%\DIOPTRE avec raccourci
       bureau, lanceur, arret et desinstallateur (-NoShortcuts pour un test).
-    - BM318d-Fenetre.pyw : petite fenetre de controle (en ligne / hors ligne,
+    - DIOPTRE-Fenetre.pyw : petite fenetre de controle (en ligne / hors ligne,
       Ouvrir, Sauvegarder, Arreter), sans terminal.
     - Mise a jour controlee : /api/mc/version, /api/mc/update/check (compare a
-      installer\version.json) et installer\BM318d-Update.ps1 (copie apres sauvegarde
+      installer\version.json) et installer\DIOPTRE-Update.ps1 (copie apres sauvegarde
       de l'installation actuelle ; rien n'est telecharge automatiquement).
 17. Branches et competences (P2/P6) :
     - « + Branche » cree une branche avec son architecte ; plusieurs architectes
@@ -82,7 +82,7 @@ SECURITE (ajoute le 18/10) :
 - Cela protege des pages web tierces et des requetes aveugles ; cela ne protege pas
   d'un programme local lance par le meme utilisateur. Le serveur reste sur 127.0.0.1.
 
-Base partagee : bm318d.sqlite3 (ne pas remplacer par une base de test)
+Base partagee : dioptre.sqlite3 (ne pas remplacer par une base de test)
 Sauvegarde : dossier backups\  (python MissionControl.py --sauvegarde)
 Tests : python test_mission_control.py   (logique)
         python test_http.py              (integration HTTP, base temporaire)

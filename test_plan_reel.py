@@ -42,7 +42,7 @@ if not modele:
     print('Aucun modèle installé')
     sys.exit(3)
 
-dossier = Path(tempfile.mkdtemp(prefix='bm318d-plan-reel-'))
+dossier = Path(tempfile.mkdtemp(prefix='dioptre-plan-reel-'))
 mc.DB = dossier / 'plan.sqlite3'
 mc_agent.WORKSPACES = dossier / 'workspaces'
 with mc.connect() as c:

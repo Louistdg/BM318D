@@ -1,4 +1,4 @@
-"""BM318d V2.1 — tests négatifs de sécurité.
+"""DIOPTRE V2.1 — tests négatifs de sécurité.
 
 Chaque test démontre qu'un contournement possible avant le durcissement est
 maintenant refusé : identité obligatoire, permissions fermées, preuves liées à
@@ -41,7 +41,7 @@ def refuse(nom, fonction, extrait=''):
         ok(nom, extrait.lower() in str(e).lower(), str(e))
 
 
-dossier = Path(tempfile.mkdtemp(prefix='bm318d-securite-'))
+dossier = Path(tempfile.mkdtemp(prefix='dioptre-securite-'))
 mc.DB = dossier / 'securite.sqlite3'
 mc_agent.WORKSPACES = dossier / 'workspaces'
 mc_sandbox.SANDBOX = dossier / 'sandbox'

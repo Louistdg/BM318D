@@ -26,7 +26,7 @@ def ok(nom, condition, detail=''):
         print('  ECHEC ' + nom + (('  -> ' + str(detail)[:300]) if detail != '' else ''))
 
 
-dossier = Path(tempfile.mkdtemp(prefix='bm318d-revue-'))
+dossier = Path(tempfile.mkdtemp(prefix='dioptre-revue-'))
 mc.DB = dossier / 'revue.sqlite3'
 mc_agent.WORKSPACES = dossier / 'workspaces'
 with mc.connect() as c:
@@ -122,7 +122,7 @@ except ValueError as e:
     ok('une revue « probleme » empêche la validation', 'code' in str(e), str(e))
 
 print('\n=== commit Git ===')
-commit = appel('/api/mc/job/commit', id=job, message='BM318d : module f', agent_id=agent)
+commit = appel('/api/mc/job/commit', id=job, message='DIOPTRE : module f', agent_id=agent)
 ok('un commit est créé', isinstance(commit.get('commit'), str) and len(commit['commit']) == 40, commit)
 with mc.connect() as c:
     preuve = json.loads(mc.job_publie(c, 1, job)['evidence'])

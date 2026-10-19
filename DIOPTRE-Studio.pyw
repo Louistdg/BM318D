@@ -5,7 +5,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parent
 MODELE=os.environ.get('MC_OLLAMA_MODEL') or 'qwen2.5:3b'
 PORT_API=int(os.environ.get('MC_PC_PORT') or 31878)
-DB=ROOT/'bm318d.sqlite3'
+DB=ROOT/'dioptre.sqlite3'
 C={'bg':'#100e17','sidebar':'#171320','panel':'#201b2b','panel2':'#282137','stroke':'#433750','text':'#f3edf9','muted':'#b4a8c3','accent':'#aa82f5','green':'#67d5a4','orange':'#f5b96e','red':'#f08392','blue':'#83b8f4'}
 def sql(query,args=(),write=False):
     with sqlite3.connect(DB,timeout=20) as c:
@@ -31,7 +31,7 @@ class API(http.server.BaseHTTPRequestHandler):
 class Server(http.server.ThreadingHTTPServer):
     allow_reuse_address=True
     daemon_threads=True
-root=tk.Tk();root.title('BM318d Control Center — Studio');root.geometry('1360x820');root.minsize(1060,660);root.configure(bg=C['bg'])
+root=tk.Tk();root.title('DIOPTRE Control Center — Studio');root.geometry('1360x820');root.minsize(1060,660);root.configure(bg=C['bg'])
 style=ttk.Style();style.theme_use('clam')
 style.configure('Dark.TCombobox',fieldbackground=C['panel2'],background=C['panel2'],foreground=C['text'],arrowcolor=C['text'])
 style.map('Dark.TCombobox',fieldbackground=[('readonly',C['panel2'])],foreground=[('readonly',C['text'])])
@@ -48,7 +48,7 @@ def combo(parent,values,width=20):
     return x
 sidebar=frame(root,'sidebar');sidebar.pack(side='left',fill='y')
 sidebar.configure(width=210);sidebar.pack_propagate(False)
-label(sidebar,'◆  BM318d',19,'text',True,'sidebar').pack(anchor='w',padx=19,pady=(24,4))
+label(sidebar,'◆  DIOPTRE',19,'text',True,'sidebar').pack(anchor='w',padx=19,pady=(24,4))
 label(sidebar,'CONTROL CENTER',9,'accent',True,'sidebar').pack(anchor='w',padx=21,pady=(0,34))
 content=frame(root);content.pack(side='left',fill='both',expand=True)
 header=frame(content);header.pack(fill='x',padx=24,pady=(22,10))
@@ -274,7 +274,7 @@ def refresh():
     if not pid():return
     {'Vue d’ensemble':draw_dashboard,'Canvas':draw_canvas,'Tâches':draw_tasks,'Agents IA':draw_agent,'Journal & preuves':draw_events}[current]()
 def export_data():
-    path=filedialog.asksaveasfilename(defaultextension='.json',initialfile='bm318d-export.json',filetypes=[('JSON','*.json')])
+    path=filedialog.asksaveasfilename(defaultextension='.json',initialfile='dioptre-export.json',filetypes=[('JSON','*.json')])
     if not path:return
     data={k:sql('SELECT * FROM '+k) for k in ('projects','tasks','events','task_dependencies')}
     Path(path).write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding='utf-8')

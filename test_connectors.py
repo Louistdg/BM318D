@@ -2,7 +2,7 @@
 import os,sys,tempfile,sqlite3,json,threading,http.server,unittest,subprocess,socket,time
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent
-TEMP=tempfile.TemporaryDirectory(prefix='bm318d-v22-')
+TEMP=tempfile.TemporaryDirectory(prefix='dioptre-v22-')
 os.environ['MC_DB']=str(Path(TEMP.name)/'test.sqlite3')
 # Harnais complet volontairement Windows-only (coffre Credential Manager, bac à sable
 # Windows, serveur HTTP local). Sous Linux, test_connectors_securite.py couvre les
@@ -77,15 +77,15 @@ class Tests(unittest.TestCase):
         for kind in ('ollama','openai','anthropic','gemini'):
             with self.subTest(kind=kind):
                 i=self.create(kind)
-                self.call('secret',id=i,secret='bm318d-test-secret')
-                self.assertEqual(vault.get(self.ref(i)),'bm318d-test-secret')
+                self.call('secret',id=i,secret='dioptre-test-secret')
+                self.assertEqual(vault.get(self.ref(i)),'dioptre-test-secret')
                 self.call('test',id=i,approve_network=True)
                 path,body,headers=Provider.requests[-1]
-                self.assertNotIn('bm318d-test-secret',json.dumps(body))
+                self.assertNotIn('dioptre-test-secret',json.dumps(body))
                 self.assertIn('test-model',json.dumps(body) if kind!='gemini' else path)
         with mc.connect() as c:
-            self.assertNotIn('bm318d-test-secret',str(list(c.iterdump())))
-        self.assertNotIn('bm318d-test-secret',json.dumps(self.call('list')))
+            self.assertNotIn('dioptre-test-secret',str(list(c.iterdump())))
+        self.assertNotIn('dioptre-test-secret',json.dumps(self.call('list')))
     def test_03_permissions_and_quota(self):
         i=self.create(calls_limit=1)
         with self.assertRaises(ValueError):self.call('test',id=i)

@@ -1,4 +1,4 @@
-"""BM318d — arrêt propre : le serveur ne s'arrête qu'avec le jeton administrateur local.
+"""DIOPTRE — arrêt propre : le serveur ne s'arrête qu'avec le jeton administrateur local.
 
 Le jeton de session est lu dans la page. Le jeton administrateur est lu dans
 logs/admin-token.txt, à côté de ce script. Aucun des deux n'est affiché.

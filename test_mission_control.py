@@ -48,7 +48,7 @@ with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
  try:call('/api/mc/settings',key='workspace_dir',value='chemin-relatif');raise AssertionError('Relative workspace accepted')
  except ValueError:pass
  if os.name=='nt':
-  for bad in ('E:\\BM318d-test','C:\\'):
+  for bad in ('E:\\DIOPTRE-test','C:\\'):
    try:call('/api/mc/settings',key='workspace_dir',value=bad);raise AssertionError('Unsafe drive accepted: '+bad)
    except ValueError:pass
  with mc.connect() as conn:assert mc.reglages(conn,1)['workspace_dir']==str(dossier.resolve())

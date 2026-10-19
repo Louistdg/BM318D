@@ -2,8 +2,21 @@ import http.server,json,sqlite3,threading,urllib.request,urllib.parse,os
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent
 # MC_DB permet d'isoler les tests sur une base temporaire ; par defaut la base
-# de travail reste bm318d.sqlite3.
-DB=Path(os.environ.get('MC_DB') or ROOT/'bm318d.sqlite3')
+# de travail reste dioptre.sqlite3.
+
+def _base_par_defaut():
+    """Base par defaut, avec reprise de l'ancien nom (bm318d.sqlite3)."""
+    ancienne = ROOT / 'bm318d.sqlite3'
+    nouvelle = ROOT / 'dioptre.sqlite3'
+    if not nouvelle.exists() and ancienne.exists():
+        try:
+            ancienne.rename(nouvelle)
+        except OSError:
+            return ancienne
+    return nouvelle
+
+
+DB=Path(os.environ.get('MC_DB') or _base_par_defaut())
 _CACHE_MODELES={'quand':0.0,'liste':[]}
 
 def modeles_installes():
@@ -22,7 +35,7 @@ def modeles_installes():
 
 def contexte_projet(projet):
  """Contexte factuel court, lu en base. Les zeros sont dits explicitement."""
- faits=["Application: BM318d Control Center (gestion de projet, agents IA locaux, securite V2.3)"]
+ faits=["Application: DIOPTRE Control Center (gestion de projet, agents IA locaux, securite V2.3)"]
  def ajoute(texte):
   faits.append(texte)
  try:
@@ -73,7 +86,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
   self.send_response(code);self.send_header('Content-Type','application/json; charset=utf-8');self.send_header('Content-Length',str(len(b)));self.send_header('Cache-Control','no-store');self.end_headers();self.wfile.write(b)
  def do_GET(self):
   if self.path=='/':
-   b=(ROOT/'BM318d-Railway.html').read_bytes();self.send_response(200);self.send_header('Content-Type','text/html; charset=utf-8');self.send_header('Content-Length',str(len(b)));self.end_headers();self.wfile.write(b);return
+   b=(ROOT/'DIOPTRE.html').read_bytes();self.send_response(200);self.send_header('Content-Type','text/html; charset=utf-8');self.send_header('Content-Length',str(len(b)));self.end_headers();self.wfile.write(b);return
   if self.path=='/api/state':
    self.reply({'projects':db('SELECT id,name FROM projects ORDER BY id DESC'),'tasks':db('SELECT id,project_id,title,priority,agent,status FROM tasks ORDER BY id'),'events':db('SELECT id,project_id,created,agent,status,message FROM events ORDER BY id DESC LIMIT 300'),'edges':db('SELECT task_id,depends_on FROM task_dependencies'),'positions':db('SELECT project_id,task_id,x,y FROM canvas_positions')});return
   self.send_error(404)
@@ -155,5 +168,5 @@ class Handler(http.server.BaseHTTPRequestHandler):
    self.reply({'ok':True,'id':result},201)
   except (ValueError,KeyError,TypeError,json.JSONDecodeError) as e:self.reply({'error':str(e)},400)
 if __name__=='__main__':
- print('BM318d Railway UI: http://127.0.0.1:31879/',flush=True)
+ print('DIOPTRE Railway UI: http://127.0.0.1:31879/',flush=True)
  http.server.ThreadingHTTPServer(('127.0.0.1',31879),Handler).serve_forever()

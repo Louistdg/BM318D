@@ -4,7 +4,7 @@ Date : 19/10/2026. Base : tag v2.5.3, audit externe du 19/10.
 
 ## Corrigé
 
-1. **Noms de modèles Ollama échappés** dans `BM318d-Railway.html`
+1. **Noms de modèles Ollama échappés** dans `DIOPTRE.html`
    (`chargerModeles`) : `escapeHtml` sur la valeur et le texte de l'option.
 2. **Manifeste ZIP borné** dans `mc_documents.restore_imports` : taille
    déclarée vérifiée avant décompression, puis lecture en flux limitée à 8 Mio.

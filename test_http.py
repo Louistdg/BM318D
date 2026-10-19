@@ -1,7 +1,7 @@
 """Tests HTTP d'integration, sur un serveur isole et une base temporaire.
 
 Aucun acces a la base de travail : MC_DB pointe vers un dossier temporaire et
-le test verifie a la fin que bm318d.sqlite3 n'a pas ete modifie.
+le test verifie a la fin que dioptre.sqlite3 n'a pas ete modifie.
 """
 import hashlib
 import json
@@ -17,7 +17,7 @@ import urllib.request
 from pathlib import Path
 
 RACINE = Path(os.environ.get('MC_RACINE') or Path(__file__).resolve().parent)
-VRAIE_BASE = RACINE / 'bm318d.sqlite3'
+VRAIE_BASE = RACINE / 'dioptre.sqlite3'
 PYTHON = sys.executable
 passes, echecs = 0, 0
 detail_echecs = []
@@ -91,7 +91,7 @@ def empreinte(chemin):
 
 avec_base = VRAIE_BASE.exists()
 avant = empreinte(VRAIE_BASE) if avec_base else None
-dossier = tempfile.mkdtemp(prefix='bm318d-http-')
+dossier = tempfile.mkdtemp(prefix='dioptre-http-')
 base = Path(dossier) / 'test.sqlite3'
 preparer_base(base)
 port = port_libre()
@@ -264,7 +264,7 @@ finally:
         print('\n--- sortie du serveur ---\n' + sortie[-2000:])
 
 if avec_base:
-    ok('la base de travail est intacte', empreinte(VRAIE_BASE) == avant, 'bm318d.sqlite3 a change')
+    ok('la base de travail est intacte', empreinte(VRAIE_BASE) == avant, 'dioptre.sqlite3 a change')
 
 print('\n%d ok, %d echec(s)' % (passes, echecs))
 if detail_echecs:

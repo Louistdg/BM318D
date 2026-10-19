@@ -1,3 +1,3 @@
 @echo off
 cd /d "%~dp0"
-start "" pythonw "%~dp0BM318d.pyw"
+start "" pythonw "%~dp0DIOPTRE.pyw"

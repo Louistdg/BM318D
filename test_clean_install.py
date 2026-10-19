@@ -2,7 +2,7 @@
 import os, shutil, subprocess, sys, tempfile
 from pathlib import Path
 root=Path(__file__).resolve().parent
-tmp=Path(tempfile.mkdtemp(prefix="bm318d-clean-"))
+tmp=Path(tempfile.mkdtemp(prefix="dioptre-clean-"))
 db=tmp/"clean.sqlite3"
 env=dict(os.environ,MC_DB=str(db),MC_WORKSPACES=str(tmp/"workspaces"))
 code=r'''

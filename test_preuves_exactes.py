@@ -33,7 +33,7 @@ def refuse(nom, fonction, extrait):
     except (ValueError, PermissionError) as e:
         ok(nom, extrait.lower() in str(e).lower(), str(e))
 
-dossier = Path(tempfile.mkdtemp(prefix='bm318d-preuves-'))
+dossier = Path(tempfile.mkdtemp(prefix='dioptre-preuves-'))
 mc.DB = dossier / 'preuves.sqlite3'
 mc.ROOT = dossier
 with sqlite3.connect(mc.DB) as c:

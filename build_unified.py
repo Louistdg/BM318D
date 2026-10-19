@@ -1,5 +1,5 @@
 from pathlib import Path
-p=Path('BM318d.pyw')
+p=Path('DIOPTRE.pyw')
 s=p.read_text(encoding='utf-8')
 assert "app.mainloop()" in s and "load_projects()" in s
 s=s.replace('import sqlite3, json, datetime, threading, http.server, os','import sqlite3, json, datetime, threading, http.server, os, urllib.request')
@@ -106,5 +106,5 @@ def refresh():
 '''
 s=s.replace('load_projects()\ntry:\n    server=',extension+'\nload_projects()\ntry:\n    server=')
 assert "Unified agent tab" in s
-Path('BM318d-Unifie.pyw').write_text(s,encoding='utf-8')
+Path('DIOPTRE-Unifie.pyw').write_text(s,encoding='utf-8')
 print('UNIFIED_WRITTEN',len(s))
