@@ -21,4 +21,5 @@ __pycache__/
 
 # Local UI exports and personal files
 index*.html
+!site/index.html
 desktop.ini
