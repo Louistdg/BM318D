@@ -761,7 +761,7 @@ def charge_agents(c,p):
 
 # --- P7 : application, reglages, recherche, sauvegardes ----------------------
 SERVEUR=[None]
-VERSION='2.6.0'
+VERSION='2.6.1'
 MAX_TEXTE=200000
 MAX_PREUVE=8000
 ADMIN_TOKEN=os.environ.get('MC_ADMIN_TOKEN') or secrets.token_urlsafe(24)
@@ -849,7 +849,8 @@ def demander_arret():
 
 def rotation_sauvegardes(limite=10):
  base=ROOT/'backups'
- vieux=sorted(base.glob('dioptre-auto-*.sqlite3'),key=lambda x:x.stat().st_mtime,reverse=True)[limite:]
+ candidats=list(base.glob('dioptre-auto-*.sqlite3'))+list(base.glob('bm318d-auto-*.sqlite3'))
+ vieux=sorted(candidats,key=lambda x:x.stat().st_mtime,reverse=True)[limite:]
  for fichier in vieux:
   fichier.unlink(missing_ok=True)
   fichier.with_suffix('.imports.zip').unlink(missing_ok=True)

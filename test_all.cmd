@@ -11,7 +11,7 @@ if errorlevel 1 (
     exit /b 2
 )
 
-echo === DIOPTRE - Verification complete V2.5.1 ===
+echo === DIOPTRE - Verification complete V2.6.1 ===
 
 set "ETAPE=01/12 - Compilation Python"
 echo.
@@ -29,6 +29,8 @@ set "ETAPE=03/12 - Fichiers importes et sauvegardes"
 echo.
 echo [%ETAPE%]
 python -m unittest -q test_documents
+if errorlevel 1 goto :echec
+python -m unittest -q test_renommage_260
 if errorlevel 1 goto :echec
 
 set "ETAPE=04/12 - Application"

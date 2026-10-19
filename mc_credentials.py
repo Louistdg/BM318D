@@ -17,6 +17,11 @@ def target(connector_id):
     return 'DIOPTRE/V2.2/connector/' + uuid.UUID(str(connector_id)).hex
 
 
+def ancienne_cible(connector_id):
+    """Cible utilisee avant le renommage 2.6.0 (reprise une fois, puis purge)."""
+    return 'BM318d/V2.2/connector/' + uuid.UUID(str(connector_id)).hex
+
+
 if WINDOWS:
     from ctypes import wintypes as w
 
@@ -58,20 +63,36 @@ def put(connector_id, secret):
         raise ValueError('Coffre Windows indisponible')
 
 
-def get(connector_id):
+def _lire(cible):
     dll = api()
     pointer = ctypes.POINTER(Credential)()
-    if not dll.CredReadW(target(connector_id), 1, 0, ctypes.byref(pointer)):
-        if ctypes.get_last_error() == 1168:
-            return ''
-        raise ValueError('Coffre Windows indisponible')
+    if not dll.CredReadW(cible, 1, 0, ctypes.byref(pointer)):
+        return None
     try:
         return ctypes.string_at(pointer.contents.CredentialBlob, pointer.contents.CredentialBlobSize).decode('utf-16-le')
     finally:
         dll.CredFree(pointer)
 
 
+def get(connector_id):
+    secret = _lire(target(connector_id))
+    if secret is not None:
+        return secret
+    # reprise unique des cles enregistrees avant le renommage 2.6.0
+    secret = _lire(ancienne_cible(connector_id))
+    if secret is None:
+        return ''
+    try:
+        put(connector_id, secret)
+        api().CredDeleteW(ancienne_cible(connector_id), 1, 0)
+    except (ValueError, OSError):
+        pass
+    return secret
+
+
 def delete(connector_id):
     dll = api()
-    if not dll.CredDeleteW(target(connector_id), 1, 0) and ctypes.get_last_error() != 1168:
+    ok = dll.CredDeleteW(target(connector_id), 1, 0) or ctypes.get_last_error() == 1168
+    dll.CredDeleteW(ancienne_cible(connector_id), 1, 0)
+    if not ok:
         raise ValueError('Coffre Windows indisponible')
