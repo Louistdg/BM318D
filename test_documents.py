@@ -233,6 +233,42 @@ class Documents(unittest.TestCase):
         finally:
             mc.ROOT=previous_root
 
+    def test_restore_conflict_returns_http_409_json(self):
+        """Non-regression V2.5.2 : un conflit de fichier local repond 409 en JSON, sans ecraser."""
+        root = Path(_temp.name) / 'conflit-http'
+        with mc.connect() as c:
+            item = mc_documents.import_file(c, 1, {'name': 'conflit.txt',
+                'data': base64.b64encode(b'version archivee').decode()}, root)['item']
+        previous_root = mc.ROOT
+        mc.ROOT = Path(_temp.name)
+        try:
+            backup = mc.sauvegarder()
+            target = root / item['storage_path']
+
+            def restaurer():
+                request = urllib.request.Request(self.url + '/api/mc/restore',
+                    data=json.dumps({'project': 1, 'file': backup.name}).encode(),
+                    headers={'Content-Type': 'application/json',
+                             'X-MC-Token': mc.TOKEN, 'X-MC-Admin': mc.ADMIN_TOKEN})
+                try:
+                    with urllib.request.urlopen(request, timeout=10) as result:
+                        return result.status, json.load(result)
+                except urllib.error.HTTPError as error:
+                    with error:
+                        return error.code, json.load(error)
+
+            target.unlink()
+            status, body = restaurer()
+            self.assertEqual(status, 201, body)
+            self.assertEqual(target.read_bytes(), b'version archivee')
+            target.write_bytes(b'modifie localement')
+            status, body = restaurer()
+            self.assertEqual(status, 409, body)
+            self.assertIn('Fichier local', str(body.get('error', '')))
+            self.assertEqual(target.read_bytes(), b'modifie localement')
+        finally:
+            mc.ROOT = previous_root
+
 
 if __name__ == '__main__':
     unittest.main()
