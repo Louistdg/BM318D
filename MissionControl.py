@@ -1,4 +1,4 @@
-"""DIOPTRE Mission Control: isolated, additive service on 127.0.0.1:31880."""
+"""TREDIO Mission Control: isolated, additive service on 127.0.0.1:31880."""
 import http.server,json,sqlite3,shutil,datetime,threading,os,secrets,time,re
 from pathlib import Path
 import mc_agent
@@ -589,5 +589,5 @@ if __name__=='__main__':
  except OSError:pass
  SERVEUR[0]=http.server.ThreadingHTTPServer((HOST,PORT),Handler)
  adresse='http://%s:%d/'%(HOST,PORT)
- print('DIOPTRE Mission Control '+adresse+' (jeton de session actif)',flush=True)
+ print('TREDIO Mission Control '+adresse+' (jeton de session actif)',flush=True)
  SERVEUR[0].serve_forever()

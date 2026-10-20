@@ -1,4 +1,4 @@
-"""DIOPTRE V2.1 — tests négatifs de sécurité.
+"""TREDIO V2.1 — tests négatifs de sécurité.
 
 Chaque test démontre qu'un contournement possible avant le durcissement est
 maintenant refusé : identité obligatoire, permissions fermées, preuves liées à

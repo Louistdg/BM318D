@@ -1,4 +1,4 @@
-"""DIOPTRE — lanceur unique, sans fenêtre de terminal.
+"""TREDIO — lanceur unique, sans fenêtre de terminal.
 
 Démarre Mission Control si nécessaire, attend qu'il réponde, puis ouvre la page
 dans le navigateur par défaut. Un second lancement n'ouvre pas un second serveur.

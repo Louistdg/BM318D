@@ -1,10 +1,10 @@
-# DIOPTRE
+# TREDIO
 
-**Version 2.5.4 — 19/10/2026.** Ancien nom de code : **DIOPTRE**, encore présent dans certains noms de fichiers de l'application (par exemple `LANCER-DIOPTRE.cmd`).
+**Version 2.5.4 — 19/10/2026.** Ancien nom : **DIOPTRE**. Les chemins de données et le coffre historique restent compatibles.
 Ce depot contient la source complete de l'application Windows : service Python
 local, interface Mission Control, connecteurs IA, bac a sable, tests.
 
-Dioptre is a local-first Windows control center for organizing projects, AI agents,
+Tredio is a local-first Windows control center for organizing projects, AI agents,
 missions, assignments, and their evidence. The repository contains the Python
 desktop/server application, the Mission Control web interface, AI-provider and MCP
 connector code, security/sandbox modules, installer scripts, and automated tests.

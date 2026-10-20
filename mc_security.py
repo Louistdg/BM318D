@@ -9,7 +9,7 @@ from urllib.parse import urlsplit,parse_qs
 
 class Refus(PermissionError):pass
 _SEAL=object()
-_CURRENT=contextvars.ContextVar('dioptre_principal',default=None)
+_CURRENT=contextvars.ContextVar('tredio_principal',default=None)
 _TOKENS={};_LOCK=threading.RLock()
 _ISSUED=weakref.WeakValueDictionary()
 _CONFIGURATION=None

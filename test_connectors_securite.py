@@ -1,4 +1,4 @@
-"""DIOPTRE V2.3 — tests négatifs des connecteurs (SSRF, erreurs, quotas, coffre, MCP).
+"""TREDIO V2.3 — tests négatifs des connecteurs (SSRF, erreurs, quotas, coffre, MCP).
 
 Même harnais que test_connectors.py : base temporaire, serveur HTTP local simulé.
 Aucune vraie clé, aucun appel à un fournisseur réel.

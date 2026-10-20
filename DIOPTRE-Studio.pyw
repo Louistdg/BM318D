@@ -31,7 +31,7 @@ class API(http.server.BaseHTTPRequestHandler):
 class Server(http.server.ThreadingHTTPServer):
     allow_reuse_address=True
     daemon_threads=True
-root=tk.Tk();root.title('DIOPTRE Control Center — Studio');root.geometry('1360x820');root.minsize(1060,660);root.configure(bg=C['bg'])
+root=tk.Tk();root.title('TREDIO Control Center — Studio');root.geometry('1360x820');root.minsize(1060,660);root.configure(bg=C['bg'])
 style=ttk.Style();style.theme_use('clam')
 style.configure('Dark.TCombobox',fieldbackground=C['panel2'],background=C['panel2'],foreground=C['text'],arrowcolor=C['text'])
 style.map('Dark.TCombobox',fieldbackground=[('readonly',C['panel2'])],foreground=[('readonly',C['text'])])
@@ -48,7 +48,7 @@ def combo(parent,values,width=20):
     return x
 sidebar=frame(root,'sidebar');sidebar.pack(side='left',fill='y')
 sidebar.configure(width=210);sidebar.pack_propagate(False)
-label(sidebar,'◆  DIOPTRE',19,'text',True,'sidebar').pack(anchor='w',padx=19,pady=(24,4))
+label(sidebar,'◆  TREDIO',19,'text',True,'sidebar').pack(anchor='w',padx=19,pady=(24,4))
 label(sidebar,'CONTROL CENTER',9,'accent',True,'sidebar').pack(anchor='w',padx=21,pady=(0,34))
 content=frame(root);content.pack(side='left',fill='both',expand=True)
 header=frame(content);header.pack(fill='x',padx=24,pady=(22,10))

@@ -1,4 +1,4 @@
-﻿; Installateur Windows de DIOPTRE â€” genere avec Inno Setup 6.
+﻿; Installateur Windows de TREDIO â€” genere avec Inno Setup 6.
 ; Installation par utilisateur, sans droits administrateur.
 
 #ifndef PayloadDir
@@ -7,14 +7,14 @@
 #ifndef IconPath
 #define IconPath "dioptre.ico"
 #endif
-#define AppName "DIOPTRE"
+#define AppName "TREDIO"
 #define AppVersion "2.8.4"
-#define AppPublisher "DIOPTRE"
-#define AppExe "LANCER-DIOPTRE.cmd"
+#define AppPublisher "TREDIO"
+#define AppExe "LANCER-TREDIO.cmd"
 
 [Setup]
 #ifdef TestBuild
-AppId=DIOPTRE-Installer-Isolated-Test
+AppId=TREDIO-Installer-Isolated-Test
 Uninstallable=no
 CreateUninstallRegKey=no
 #else
@@ -29,7 +29,7 @@ DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 OutputDir=build
-OutputBaseFilename=DIOPTRE-Setup-{#AppVersion}-r1
+OutputBaseFilename=TREDIO-Setup-{#AppVersion}-r2
 SetupIconFile={#IconPath}
 UninstallDisplayIcon={app}\dioptre.ico
 UninstallDisplayName={#AppName} {#AppVersion}
@@ -52,14 +52,14 @@ Source: "{#IconPath}"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 #ifndef TestBuild
-Name: "{group}\DIOPTRE"; Filename: "{app}\{#AppExe}"; WorkingDir: "{app}"; IconFilename: "{app}\dioptre.ico"
-Name: "{group}\Desinstaller DIOPTRE"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\DIOPTRE"; Filename: "{app}\{#AppExe}"; WorkingDir: "{app}"; IconFilename: "{app}\dioptre.ico"; Tasks: bureau
+Name: "{group}\TREDIO"; Filename: "{app}\{#AppExe}"; WorkingDir: "{app}"; IconFilename: "{app}\dioptre.ico"
+Name: "{group}\Desinstaller TREDIO"; Filename: "{uninstallexe}"
+Name: "{autodesktop}\TREDIO"; Filename: "{app}\{#AppExe}"; WorkingDir: "{app}"; IconFilename: "{app}\dioptre.ico"; Tasks: bureau
 
 #endif
 
 [Run]
-Filename: "{app}\{#AppExe}"; Description: "Lancer DIOPTRE maintenant"; Flags: postinstall nowait skipifsilent shellexec
+Filename: "{app}\{#AppExe}"; Description: "Lancer TREDIO maintenant"; Flags: postinstall nowait skipifsilent shellexec
 
 [Code]
 function PythonCompatible(const Exe: String): Boolean;
@@ -78,11 +78,11 @@ begin
   if Result then Result := PythonCompatible('pythonw.exe');
   if not Result then
   begin
-    Log('DIOPTRE: Python 3.14 avec sqlite3 et pythonw requis. Installation annulee.');
+    Log('TREDIO: Python 3.14 avec sqlite3 et pythonw requis. Installation annulee.');
     if not WizardSilent then
-      MsgBox('Python 3.14 est requis avant DIOPTRE.' + #13#10 +
+      MsgBox('Python 3.14 est requis avant TREDIO.' + #13#10 +
         'Installez-le depuis https://www.python.org/downloads/windows/ en cochant Add python.exe to PATH.' + #13#10 +
-        'Fermez puis relancez cet installateur. Aucun fichier DIOPTRE n''a ete installe.',
+        'Fermez puis relancez cet installateur. Aucun fichier TREDIO n''a ete installe.',
         mbError, MB_OK);
   end;
 end;

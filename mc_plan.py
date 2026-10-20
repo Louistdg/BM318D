@@ -1,4 +1,4 @@
-"""DIOPTRE — P2 : planification multi-agents.
+"""TREDIO — P2 : planification multi-agents.
 
 Décomposition d'un objectif en tâches (par un modèle, injectable pour les tests),
 validation du graphe de dépendances, choix d'agent selon rôle et charge, et

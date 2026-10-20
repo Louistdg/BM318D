@@ -51,7 +51,7 @@ class Server(http.server.ThreadingHTTPServer):
     daemon_threads=True
     allow_reuse_address=True
 
-app=tk.Tk();app.title('DIOPTRE Control Center — Local');app.geometry('1180x760');app.minsize(880,580);app.configure(bg='#111019')
+app=tk.Tk();app.title('TREDIO Control Center — Local');app.geometry('1180x760');app.minsize(880,580);app.configure(bg='#111019')
 style=ttk.Style();style.theme_use('clam')
 style.configure('TFrame',background='#111019')
 style.configure('TLabel',background='#111019',foreground='#e9e5f1',font=('Segoe UI',10))
@@ -62,7 +62,7 @@ style.configure('Treeview',background='#1b1724',fieldbackground='#1b1724',foregr
 style.configure('Treeview.Heading',background='#30273e',foreground='#e8dcfa',font=('Segoe UI',10,'bold'))
 style.map('Treeview',background=[('selected','#624582')])
 main=ttk.Frame(app,padding=20);main.pack(fill='both',expand=True)
-ttk.Label(main,text='◆ DIOPTRE  /  CONTROL CENTER',font=('Segoe UI',19,'bold')).pack(anchor='w')
+ttk.Label(main,text='◆ TREDIO  /  CONTROL CENTER',font=('Segoe UI',19,'bold')).pack(anchor='w')
 ttk.Label(main,text='Supervision locale • Projets, tâches, agents et événements vérifiables').pack(anchor='w',pady=(0,12))
 top=ttk.Frame(main);top.pack(fill='x')
 ttk.Label(top,text='Projet :').pack(side='left')

@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Installation — DIOPTRE</title>
+<title>Installation — TREDIO</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="canonical" href="https://dioptre.socle-construction.be/installation.html">
-<meta name="description" content="Installer DIOPTRE sur Windows : Python 3.14, Ollama, lancement et première ouverture.">
+<meta name="description" content="Installer TREDIO sur Windows : Python 3.14, Ollama, lancement et première ouverture.">
 <style>
   :root{
     color-scheme:dark;
@@ -60,7 +60,7 @@
 <body>
 <header>
   <div class="enveloppe">
-    <a class="marque" href="index.html"><span class="point" aria-hidden="true"></span> DIOPTRE</a>
+    <a class="marque" href="index.html"><span class="point" aria-hidden="true"></span> TREDIO</a>
     <nav><a href="index.html">← Accueil</a>
       <button id="bascule-theme" class="bascule" type="button" aria-pressed="false">
         <span class="rond" aria-hidden="true"></span><span class="libelle">Theme nuit</span>
@@ -71,31 +71,31 @@
 
 <main>
   <div class="enveloppe">
-    <h1>Installer DIOPTRE</h1>
-    <p class="chapeau">Quatre étapes, une seule fois. Prévoyez l’installation de Python 3.14 avant DIOPTRE ; la durée dépend des téléchargements. Ollama est facultatif.</p>
+    <h1>Installer TREDIO</h1>
+    <p class="chapeau">Quatre étapes, une seule fois. Prévoyez l’installation de Python 3.14 avant TREDIO ; la durée dépend des téléchargements. Ollama est facultatif.</p>
 
     <ol class="etapes">
       <li>
         <h2>Installer Python 3.14</h2>
         <p>Téléchargez Python 3.14 depuis <a href="https://www.python.org/downloads/windows/" target="_blank" rel="noopener">python.org</a> et lancez l'installateur.</p>
-        <div class="note">Cochez <strong>« Add python.exe to PATH »</strong> sur la première fenêtre. Sans cette case, DIOPTRE ne peut pas démarrer.</div>
+        <div class="note">Cochez <strong>« Add python.exe to PATH »</strong> sur la première fenêtre. Sans cette case, TREDIO ne peut pas démarrer.</div>
       </li>
 
       <li>
-        <h2>Télécharger DIOPTRE</h2>
-        <p>Un seul fichier, l'installateur Windows (2 Mo), révision 1. Il vérifie Python 3.14 et son lanceur sans console avant toute copie. Si le contrôle échoue, installez Python en cochant « Add python.exe to PATH », puis relancez l’installateur.</p>
-        <a class="btn" href="https://dioptre.socle-construction.be/telechargements/DIOPTRE-Setup-2.8.4-r1.exe" download="DIOPTRE-Setup-2.8.4-r1.exe">↓ Télécharger l'installateur</a>
+        <h2>Télécharger TREDIO</h2>
+        <p>Un seul fichier, l'installateur Windows (2 Mo), révision 2. Il vérifie Python 3.14 et son lanceur sans console avant toute copie. Si le contrôle échoue, installez Python en cochant « Add python.exe to PATH », puis relancez l’installateur.</p>
+        <a class="btn" href="https://dioptre.socle-construction.be/telechargements/TREDIO-Setup-2.8.4-r2.exe" download="TREDIO-Setup-2.8.4-r2.exe">↓ Télécharger l'installateur</a>
       </li>
 
       <li>
         <h2>Lancer l'installateur</h2>
-        <p>Double-cliquez sur <strong>DIOPTRE-Setup-2.8.4-r1.exe</strong>. Windows peut afficher un avertissement « application non reconnue » : cliquez sur <em>Informations complémentaires</em> puis <em>Exécuter quand même</em>.</p>
+        <p>Double-cliquez sur <strong>TREDIO-Setup-2.8.4-r1.exe</strong>. Windows peut afficher un avertissement « application non reconnue » : cliquez sur <em>Informations complémentaires</em> puis <em>Exécuter quand même</em>.</p>
         <p>L'installation se fait dans votre profil, sans mot de passe administrateur.</p>
       </li>
 
       <li>
-        <h2>Ouvrir DIOPTRE</h2>
-        <p>Un raccourci <strong>DIOPTRE</strong> est créé sur le Bureau et dans le menu Démarrer. Double-cliquez dessus : l'interface s'ouvre à l'adresse ci-dessous.</p>
+        <h2>Ouvrir TREDIO</h2>
+        <p>Un raccourci <strong>TREDIO</strong> est créé sur le Bureau et dans le menu Démarrer. Double-cliquez dessus : l'interface s'ouvre à l'adresse ci-dessous.</p>
         <span class="code">http://127.0.0.1:31880/</span>
         <p>Si le navigateur reste vide, attendez quelques secondes puis rechargez la page.</p>
       </li>
@@ -126,7 +126,7 @@
       </details>
       <details>
         <summary>Comment arrêter l'application ?</summary>
-        <p>DIOPTRE fonctionne en arrière-plan, sans fenêtre de terminal. Fermer l’onglet du navigateur ne suffit pas à arrêter le service. Double-cliquez sur <strong>ARRETER-DIOPTRE.cmd</strong> dans le dossier d'installation. L'arrêt propre enregistre la base et ferme le serveur.</p>
+        <p>TREDIO fonctionne en arrière-plan, sans fenêtre de terminal. Fermer l’onglet du navigateur ne suffit pas à arrêter le service. Double-cliquez sur <strong>ARRETER-TREDIO.cmd</strong> dans le dossier d'installation. L'arrêt propre enregistre la base et ferme le serveur.</p>
       </details>
       <details>
         <summary>Où sont les sauvegardes ?</summary>
@@ -145,12 +145,12 @@
 </main>
 
 <footer>
-  <div class="enveloppe">© 2026 DIOPTRE — DIOPTRE 2.8.4 · <a href="index.html">Accueil</a></div>
+  <div class="enveloppe">© 2026 TREDIO — TREDIO 2.8.4 · <a href="index.html">Accueil</a></div>
 </footer>
 
 <script>
 (function(){
-  var cle = 'dioptre-theme';
+  var cle = 'tredio-theme';
   var racine = document.documentElement;
   function lire(){ try { return localStorage.getItem(cle); } catch(e){ return null; } }
   function ecrire(v){ try { localStorage.setItem(cle, v); } catch(e){} }

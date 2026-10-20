@@ -4,6 +4,7 @@ Extrait de MissionControl.py : les fonctions ne dependent plus de l'etat global
 du serveur, elles recoivent la racine, le chemin de la base et, pour la
 restauration, les fonctions d'audit et de migration.
 """
+from contextlib import closing
 import datetime
 import sqlite3
 import time
@@ -24,7 +25,7 @@ def sauvegarder(racine, base, destination=None, *, inclure_imports=True):
     if not base.is_file():
         return None
     if destination is None:
-        destination = racine / 'backups' / ('dioptre-' + datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.sqlite3')
+        destination = racine / 'backups' / ('tredio-' + datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.sqlite3')
     destination = destination if hasattr(destination, 'parent') else racine / 'backups' / str(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
     source = sqlite3.connect(base, timeout=20)
@@ -51,14 +52,27 @@ def disponibles(racine):
             for f in sorted(dossier.glob('*.sqlite3'), key=lambda x: x.stat().st_mtime, reverse=True)[:30]]
 
 
+def verifier_base(source):
+    """Refuser une sauvegarde invalide avant toute modification des donnees."""
+    try:
+        with closing(sqlite3.connect(source.resolve().as_uri() + '?mode=ro', uri=True)) as connexion:
+            controle = connexion.execute('PRAGMA quick_check').fetchall()
+            tables = connexion.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").fetchall()
+            if controle != [('ok',)] or not tables:
+                raise ValueError('Sauvegarde SQLite invalide ou vide')
+    except sqlite3.Error as erreur:
+        raise ValueError('Sauvegarde SQLite illisible ou corrompue') from erreur
+
+
 def restaurer(c, p, d, *, racine, base, audit, init):
     nom = _texte(d, 'file', 200)
     dossier = (racine / 'backups').resolve()
     source = (dossier / nom).resolve()
-    if source.parent != dossier or not source.exists():
+    if source.parent != dossier or not source.is_file() or source.suffix != '.sqlite3':
         raise ValueError('Sauvegarde introuvable dans backups/ : ' + nom)
+    verifier_base(source)
     securite = sauvegarder(racine, base,
-                           racine / 'backups' / ('dioptre-avant-restauration-'
+                           racine / 'backups' / ('tredio-avant-restauration-'
                                                  + datetime.datetime.now().strftime('%Y%m%d-%H%M%S') + '.sqlite3'),
                            inclure_imports=False)
     archive = source.with_suffix('.imports.zip')
@@ -80,7 +94,7 @@ def restaurer(c, p, d, *, racine, base, audit, init):
 
 def rotation(racine, limite=10):
     dossier = racine / 'backups'
-    candidats = list(dossier.glob('dioptre-auto-*.sqlite3')) + list(dossier.glob('bm318d-auto-*.sqlite3'))
+    candidats = list(dossier.glob('tredio-auto-*.sqlite3')) + list(dossier.glob('dioptre-auto-*.sqlite3')) + list(dossier.glob('bm318d-auto-*.sqlite3'))
     vieux = sorted(candidats, key=lambda x: x.stat().st_mtime, reverse=True)[limite:]
     for fichier in vieux:
         fichier.unlink(missing_ok=True)
@@ -94,7 +108,7 @@ def boucle(racine, base, minutes):
         try:
             dossier = racine / 'backups'
             sauvegarder(racine, base,
-                        dossier / ('dioptre-auto-' + datetime.datetime.now().strftime('%Y%m%d-%H%M%S') + '.sqlite3'))
+                        dossier / ('tredio-auto-' + datetime.datetime.now().strftime('%Y%m%d-%H%M%S') + '.sqlite3'))
             rotation(racine, 10)
             mc_corbeille.purger([racine / 'workspaces'], mc_corbeille.RETENTION_JOURS)
         except Exception:

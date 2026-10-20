@@ -94,7 +94,7 @@ def affectation_modifier(c, p, d):
         preuve = json.dumps(d['evidence'], ensure_ascii=False)[:8000]
     verifie = 1 if verification in ('human', 'test') else 0
     verifie_le = (datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
-                  if verifie else actuelle['verified_at'])
+                  if verifie else None)
     verifie_par = m.auteur_preuve() if verifie else None
     c.execute('UPDATE mc_assignments SET status=?,result=?,verified=?,verification=?,evidence=?,'
               'verified_at=?,verified_by=? WHERE id=?',

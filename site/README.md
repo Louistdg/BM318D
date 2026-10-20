@@ -31,7 +31,7 @@ Empreinte publiee sur la page d'accueil :
   dans `index.html` en data URI. Un seul appel réseau pour toute la page.
 - Deux thèmes : **Sable** par défaut (gris neutre, texte blanc chaud), **Nuit**
   en option (violet sombre). Le choix est mémorisé dans `localStorage`
-  (clé `dioptre-theme`).
+  (clé `tredio-theme`).
 - Aucun traceur, aucun cookie, aucune statistique.
 
 ## Comment le publier

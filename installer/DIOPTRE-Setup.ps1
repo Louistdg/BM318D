@@ -1,4 +1,4 @@
-﻿# Installation locale de DIOPTRE (sans installateur tiers).
+﻿# Installation locale de TREDIO (sans installateur tiers).
 # Copie l'application, crée un raccourci de démarrage et un désinstalleur.
 param(
   [string]$TargetDir = "$env:LOCALAPPDATA\DIOPTRE",
@@ -11,7 +11,7 @@ New-Item -ItemType Directory -Force -Path $TargetDir | Out-Null
 
 $fichiers = @('MissionControl.py','mc_agent.py','mc_plan.py','mc_sandbox.py','mc_sandbox_wsl.py','mc_sandbox_linux.py','mc_security.py','mc_connectors.py','mc_credentials.py','mc_documents.py','mc_actions.py','mc_agents.py','mc_store.py','mc_backups.py','mc_corbeille.py','mc_jobs.py','mc_legacy.py','mc_missions.py','mc_routes.py','DIOPTRE.html','mission.js','mission.css','connectors.js','security-ui.js','workspace.js','workspace.css','installer\version.json',
               'DIOPTRE-Controleur.pyw','DIOPTRE-Stop.py','LANCER-DIOPTRE-RAILWAY.cmd','requirements-v22.txt',
-              'README.md','DIOPTRE-LISEZMOI.txt','docs\DELIVERY-V25-HOTFIX.md','docs\SECURITY-STATUS.md','mc_demo.py')
+              'README.md','TREDIO-LISEZMOI.txt','docs\DELIVERY-V25-HOTFIX.md','docs\SECURITY-STATUS.md','mc_demo.py')
 $copies = 0
 foreach ($nom in $fichiers) {
   $chemin = Join-Path $source $nom
@@ -64,7 +64,7 @@ if (-not $NoShortcuts) {
   $raccourci = $shell.CreateShortcut((Join-Path $bureau 'DIOPTRE.lnk'))
   $raccourci.TargetPath = Join-Path $TargetDir 'LANCER-DIOPTRE.cmd'
   $raccourci.WorkingDirectory = $TargetDir
-  $raccourci.Description = 'DIOPTRE Control Center'
+  $raccourci.Description = 'TREDIO Control Center'
   $raccourci.Save()
 }
 
@@ -76,5 +76,5 @@ Write-Host 'Les donnees restent dans' `$dossier 'si vous ne le supprimez pas.'
 "@
 Set-Content -Path (Join-Path $TargetDir 'desinstaller.ps1') -Value $desinstaller -Encoding UTF8
 
-Write-Host "DIOPTRE installe dans $TargetDir ($copies fichiers)."
+Write-Host "TREDIO installe dans $TargetDir ($copies fichiers)."
 Write-Host "Lancement : $(Join-Path $TargetDir 'LANCER-DIOPTRE.cmd')"

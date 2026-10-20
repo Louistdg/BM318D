@@ -1,4 +1,4 @@
-﻿# Mise a jour controlee de DIOPTRE : copie les fichiers d'une version preparee,
+﻿# Mise a jour controlee de TREDIO : copie les fichiers d'une version preparee,
 # apres avoir sauvegarde l'installation actuelle. Aucune mise a jour automatique.
 param(
   [Parameter(Mandatory=$true)][string]$Source,

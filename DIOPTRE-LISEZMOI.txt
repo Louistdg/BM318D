@@ -1,4 +1,4 @@
-DIOPTRE Control Center — V2.5.1
+TREDIO Control Center — V2.5.1
 
 Lancement : double-cliquer sur LANCER-DIOPTRE-RAILWAY.cmd
 Adresse locale : http://127.0.0.1:31880/

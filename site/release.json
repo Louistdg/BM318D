@@ -1,10 +1,10 @@
 {
   "application_version": "2.8.4",
-  "installer_revision": 1,
+  "installer_revision": 2,
   "installer": {
-    "filename": "DIOPTRE-Setup-2.8.4-r1.exe",
-    "size": 2151047,
-    "sha256": "ce007c58e79c6ec30df0b2b5b5c648414d8fb60f80e4dc9cd16fb8403bab4ab2"
+    "filename": "TREDIO-Setup-2.8.4-r2.exe",
+    "size": 2151118,
+    "sha256": "14c38807ec0d7eb115dbebd0106777795201bdc0304e569e9615360e55a29b10"
   },
   "audit": {
     "filename": "DIOPTRE-AUDIT-2.8.4.zip",

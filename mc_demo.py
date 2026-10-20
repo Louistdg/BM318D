@@ -1,4 +1,4 @@
-"""Mode demonstration de DIOPTRE.
+"""Mode demonstration de TREDIO.
 
 Cree un projet complet et coherent : trois agents, une mission, une affectation,
 un job reellement execute (proposition, diff, ecriture, compilation verifiee),
@@ -162,7 +162,7 @@ def main(argv=None):
     import os
     import sys
 
-    parseur = argparse.ArgumentParser(description='Crée une démonstration DIOPTRE complète.')
+    parseur = argparse.ArgumentParser(description='Crée une démonstration TREDIO complète.')
     parseur.add_argument('--force', action='store_true', help='recrée la démonstration si elle existe')
     parseur.add_argument('--nom', default=NOM_PROJET, help='nom du projet de démonstration')
     options = parseur.parse_args(argv)

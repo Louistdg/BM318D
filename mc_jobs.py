@@ -303,7 +303,7 @@ def job_commit(c,p,d):
  acteur(c,p,d,'can_approve_jobs')
  j=job_publie(c,p,int(d['id']))
  if j['status'] not in ('approved','completed'):raise ValueError('Seul un travail appliqué peut être commité')
- message=str(d.get('message') or ('DIOPTRE job %d : %s'%(j['id'],j['title'])))[:200]
+ message=str(d.get('message') or ('TREDIO job %d : %s'%(j['id'],j['title'])))[:200]
  resultat=mc_agent.commit_git(Path(j['workspace']),message)
  try:preuve=json.loads(j['evidence'] or '{}')
  except ValueError:preuve={}

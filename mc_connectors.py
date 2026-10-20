@@ -229,7 +229,7 @@ def request_json(url, body, headers, timeout):
     if len(raw)>2_000_000: raise FournisseurErreur('Réponse trop volumineuse')
     try:
         return json.loads(raw)
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, UnicodeDecodeError):
         raise FournisseurErreur('Réponse JSON invalide') from None
 
 def _cle(r, obligatoire):
@@ -263,7 +263,7 @@ def request_get(url, headers, timeout):
     if len(brut)>2_000_000: raise FournisseurErreur('Reponse trop volumineuse')
     try:
         return json.loads(brut)
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, UnicodeDecodeError):
         raise FournisseurErreur('Reponse JSON invalide') from None
 
 

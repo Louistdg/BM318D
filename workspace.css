@@ -1,4 +1,4 @@
-/* DIOPTRE V2.5 operator workspace: responsive, resizable navigation */
+/* TREDIO V2.5 operator workspace: responsive, resizable navigation */
 .rail{--sidebar-width:216px;width:var(--sidebar-width);padding:14px 10px;align-items:stretch;position:relative;gap:5px;overflow:visible;transition:width .14s ease}
 .rail .logo{display:flex;align-items:center;gap:12px;white-space:nowrap;font-size:22px;margin:0 0 6px;padding:10px 8px}
 .rail .nav-brand{font-size:15px;font-weight:750;letter-spacing:.03em;color:#eceaf2}

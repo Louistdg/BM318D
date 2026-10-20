@@ -1,4 +1,4 @@
-"""Routes historiques de DIOPTRE, repliees dans le routeur normal.
+"""Routes historiques de TREDIO, repliees dans le routeur normal.
 
 Elles etaient servies par un second serveur HTTP (DIOPTRE-WebServer.py, port
 31879, sans authentification) charge par importlib et herite par sous-classement.
@@ -37,7 +37,7 @@ def modeles_installes():
 
 def contexte_projet(c, projet):
     """Contexte factuel court, lu en base. Les zeros sont dits explicitement."""
-    faits = ['Application: DIOPTRE Control Center (gestion de projet, agents IA locaux, securite V2.3)']
+    faits = ['Application: TREDIO Control Center (gestion de projet, agents IA locaux, securite V2.3)']
 
     def ajoute(texte):
         faits.append(texte)
