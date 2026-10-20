@@ -1,6 +1,6 @@
 # TREDIO
 
-**Version 2.5.4 — 19/10/2026.** Ancien nom : **DIOPTRE**. Les chemins de données et le coffre historique restent compatibles.
+**Version 2.8.4 — TREDIO, 20/10/2026.** Ancien nom : **DIOPTRE**. Les chemins de données et le coffre historique restent compatibles.
 Ce depot contient la source complete de l'application Windows : service Python
 local, interface Mission Control, connecteurs IA, bac a sable, tests.
 
